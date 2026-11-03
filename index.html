@@ -36,48 +36,41 @@ label{font-size:12px;color:#526474;font-weight:650;display:block;margin:0 0 5px}
 .photocard{border:1px solid var(--line);border-radius:9px;overflow:hidden;min-width:0}.photocard img{width:100%;height:125px;object-fit:cover;display:block;background:#eef2f4}.photocard .phototext{padding:8px;font-size:12px}.photocard .phototext button{margin-top:6px;padding:5px 7px;font-size:11px}
 #photoInput,#cameraInput{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.photo-actions{display:flex;gap:8px;flex-wrap:wrap}.small{font-size:11px;color:var(--muted)}footer{font-size:11px;color:#687987;padding:13px 2px}
 
-body{background:#fff}header{padding:9px 13px}header h1{font-size:18px}header p{display:none}
-main{max-width:none;margin:0;padding:0}
-#mapPanel{border:0;border-radius:0;box-shadow:none}
-#mapPanel .panelhead,#mapPanel .mapfoot{display:none}
-#map{height:calc(100dvh - 56px);min-height:340px}
-#settingsBack{position:fixed;inset:0;background:#10283d99;z-index:2500;display:none;align-items:stretch;justify-content:flex-end}
-#settingsPage{background:var(--bg);width:min(760px,100%);height:100%;overflow:auto;padding:12px}
-#settingsPage .workspace{display:block;margin-top:12px}
-#settingsPage #directory{max-height:none;min-height:120px;overflow:visible}
-#settingsPage .entry{grid-template-columns:1fr}
-#settingsPage .panel{margin-bottom:12px}
-@media(max-width:900px){.workspace{grid-template-columns:1fr}#map{height:58vh;min-height:350px}#directory{max-height:400px}.entry{grid-template-columns:1fr}.formrow{grid-template-columns:1fr}.photoarea{grid-template-columns:repeat(2,minmax(0,1fr))}}
+body{background:#f4f7fa}
+header{padding:10px 14px}
+header h1{font-size:19px}
+main.workspace{max-width:none;margin:0;padding:12px;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);align-items:start}
+#mapPanel{border:1px solid var(--line);border-radius:10px;box-shadow:none;overflow:hidden}
+#map{height:calc(100vh - 92px);min-height:520px;background:#fff}
+.sidecolumn{display:grid;gap:10px;min-width:0}
+.sidecolumn .panel{margin:0}
+.sidecolumn #directory{max-height:calc(100vh - 280px);min-height:180px;overflow:auto}
+.sidecolumn .entry{grid-template-columns:1fr}
+.sidecolumn .note{padding-bottom:4px}
+.sidecolumn .status{padding-top:4px}
+@media(max-width:900px){main.workspace{grid-template-columns:1fr;padding:8px;gap:8px}#map{height:55vh;min-height:320px}.sidecolumn #directory{max-height:45vh;min-height:120px}.sidecolumn .entry{grid-template-columns:1fr}.formrow{grid-template-columns:1fr}.photoarea{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media print{
- @page{size:landscape;margin:6mm}
+ @page{size:landscape;margin:5mm}
  html,body{width:100%;height:auto;background:#fff!important;margin:0!important;padding:0!important;overflow:visible!important}
- body{display:grid!important;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);gap:6mm;align-items:start}
- header,.entry,.note,.status,footer,.mapfoot,.tools,.locbuttons,.modalback,#settingsHead{display:none!important}
- main{display:contents!important}
+ header,.entry,.note,.status,footer,.tools,.locbuttons,.modalback{display:none!important}
+ main.workspace{display:grid!important;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr)!important;gap:5mm!important;margin:0!important;padding:0!important;align-items:start}
  #mapPanel{display:block!important;grid-column:1;min-width:0;border:1px solid #aaa;border-radius:0;box-shadow:none;overflow:hidden}
- #map{height:184mm!important;min-height:0!important;width:100%!important}
- #settingsBack{grid-column:2;position:static!important;display:block!important;background:white!important;z-index:auto!important;overflow:visible!important;min-width:0}
- #settingsPage{width:auto!important;height:auto!important;max-height:none!important;overflow:visible!important;padding:0!important;background:white!important}
- #settingsPage .panelhead{padding:4px;border-bottom:1px solid #aaa}
- #settingsPage .panelhead strong{font-size:11px}
- #settingsPage .panel{border:1px solid #aaa;border-radius:0;box-shadow:none;overflow:visible}
- #settingsPage #directory{max-height:none!important;min-height:0!important;overflow:visible!important;padding:2px 5px}
- .loc{padding:3px 0;grid-template-columns:18px minmax(0,1fr);gap:4px;break-inside:avoid}
- .num{width:16px;height:16px;font-size:8px}.locname{font-size:8px}.address{font-size:7px;line-height:1.15;overflow-wrap:anywhere}
- #settingsPage .panel:has(#addForm){display:none!important}
+ #map{height:185mm!important;min-height:0!important;width:100%!important}
+ .sidecolumn{display:block!important;grid-column:2;min-width:0}
+ .sidecolumn .panel{border:1px solid #aaa;border-radius:0;box-shadow:none;overflow:visible;margin-bottom:3mm}
+ .sidecolumn .panelhead{padding:3px 5px}
+ .sidecolumn .panelhead strong{font-size:10px}
+ .sidecolumn #directory{max-height:none!important;min-height:0!important;overflow:visible!important;padding:2px 5px}
+ .loc{padding:2px 0;grid-template-columns:17px minmax(0,1fr);gap:4px;break-inside:avoid}
+ .num{width:15px;height:15px;font-size:8px}.locname{font-size:8px}.address{font-size:7px;line-height:1.1;overflow-wrap:anywhere}
 }
 </style>
 </head>
 <body>
-<header><div><h1>Michigan Location Map</h1></div><button class="secondary" onclick="openSettings()">⚙ Settings</button></header>
-<main>
-<section class="panel" id="mapPanel"><div id="map" aria-label="Michigan Lower Peninsula county map"></div></section>
-</main>
-<div id="settingsBack" role="dialog" aria-modal="true" aria-label="Settings and location directory">
- <section id="settingsPage">
-  <div class="panelhead" id="settingsHead" style="background:white;border:1px solid var(--line);border-radius:10px;margin-bottom:12px">
-   <strong>Settings &amp; Location Directory</strong><div class="tools"><button class="secondary" onclick="printPDF()">Print / Save PDF</button><button onclick="closeSettings()">Done</button></div>
-  </div>
+<header><div><h1>Michigan Location Map</h1><div style="font-size:12px;color:#dce7ef">Lower Peninsula · county boundaries · numbered locations</div></div><button onclick="printPDF()">Print / Save PDF</button></header>
+<main class="workspace">
+ <section class="panel" id="mapPanel"><div id="map" aria-label="Michigan Lower Peninsula county map"></div></section>
+ <aside class="sidecolumn">
   <section class="panel">
    <form id="addForm" class="entry"><input id="storeName" placeholder="Store / event location name" required maxlength="120"><input id="storeAddress" placeholder="Full street address, city, MI ZIP" required maxlength="300"><button id="addBtn" type="submit">＋ Add location</button></form>
    <div class="note">Locations and photos are saved in this browser on this device. Export backups regularly. The PDF includes the map and directory only, not photos.</div>
@@ -85,8 +78,8 @@ main{max-width:none;margin:0;padding:0}
   </section>
   <section class="panel"><div class="panelhead"><strong>Location Directory (<span id="count">0</span>)</strong><div class="tools"><button class="secondary" onclick="exportBackup()">Export backup</button><button class="secondary" onclick="document.getElementById('importInput').click()">Import backup</button><input id="importInput" type="file" accept="application/json,.json" style="display:none"></div></div><div id="directory"><div class="empty">No locations yet. Add a named address above.</div></div></section>
   <footer>County boundaries are shown without county names. Location data and photos stay in this browser unless you export a backup.</footer>
- </section>
-</div>
+ </aside>
+</main>
 
 <div class="modalback" id="editBack" role="dialog" aria-modal="true" aria-labelledby="editTitle">
  <div class="modal">
@@ -105,9 +98,6 @@ main{max-width:none;margin:0;padding:0}
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-function openSettings(){document.getElementById('settingsBack').style.display='flex';setTimeout(()=>{if(map)map.invalidateSize()},100);}
-function closeSettings(){document.getElementById('settingsBack').style.display='none';setTimeout(()=>{if(map)map.invalidateSize()},100);}
-document.getElementById('settingsBack').addEventListener('click',e=>{if(e.target.id==='settingsBack')closeSettings();});
 const DB_NAME='miStoreLocationManager', DB_VERSION=1, STORE_KEY='miStoreLocationsV2';
 const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([43.55,-84.8],6);
 window.addEventListener('resize',()=>map.invalidateSize());window.addEventListener('beforeprint',()=>map.invalidateSize());
