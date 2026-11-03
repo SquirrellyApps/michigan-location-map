@@ -1,1 +1,1 @@
-# michigan-location-map
+# Retail-location-map
