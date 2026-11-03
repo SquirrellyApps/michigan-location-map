@@ -47,9 +47,9 @@ footer{font-size:11px;color:#687987;padding:12px}
 .popup-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.popup-actions button{font-size:12px;padding:7px 9px}
 @media(max-width:600px){.photoarea{grid-template-columns:1fr}.photocard{display:grid;grid-template-columns:120px minmax(0,1fr)}.photocard img,.photo-placeholder{height:120px!important}.header-logo{width:40px;height:40px}h1{font-size:17px}}
 @media(max-width:900px){main.workspace{grid-template-columns:1fr;padding:8px;gap:8px}#map{height:55vh;min-height:320px}.sidecolumn #directory{max-height:45vh;min-height:120px}.entry{grid-template-columns:1fr}.header-actions{gap:8px}}
+.print-view header,.print-view .entry,.print-view .note,.print-view .status,.print-view footer,.print-view .tools,.print-view .locbuttons{display:none!important}
 @media print{
  @page{size:landscape;margin:5mm}
- html{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
  html,body{width:100%;height:auto;background:#fff!important;margin:0!important;padding:0!important;overflow:visible!important}
  header,.entry,.note,.status,footer,.tools,.locbuttons,.photo-modal{display:none!important}
@@ -126,7 +126,10 @@ const status=m=>statusEl.textContent=m;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const id=()=>crypto.randomUUID?crypto.randomUUID():'id-'+Date.now()+'-'+Math.random().toString(16).slice(2);
 function persist(){localStorage.setItem(STORE_KEY,JSON.stringify(stores))}
-function loadStores(){try{stores=JSON.parse(localStorage.getItem(STORE_KEY)||'[]')}catch{stores=[]}
+function loadStores(){
+ const printData=new URLSearchParams(location.search).get('printData');
+ if(printData){try{stores=JSON.parse(decodeURIComponent(escape(atob(printData))));if(!Array.isArray(stores))stores=[];return}catch{stores=[]}}
+ try{stores=JSON.parse(localStorage.getItem(STORE_KEY)||'[]')}catch{stores=[]}
  if(!stores.length){try{const old=JSON.parse(localStorage.getItem('miLocationPins')||'[]');if(old.length){stores=old.map(p=>({id:id(),code:'',name:p.name||'Location',address:p.address||'',lat:Number(p.lat),lon:Number(p.lon),createdAt:new Date().toISOString()})).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon));persist()}}catch{}}
 }
 function pinIcon(n){return L.divIcon({className:'',html:`<div style="width:28px;height:28px;border:2px solid white;border-radius:50%;background:#2477b7;color:white;display:grid;place-items:center;font-weight:800;box-shadow:0 1px 5px #0006">${n}</div>`,iconSize:[28,28],iconAnchor:[14,14]})}
@@ -174,21 +177,34 @@ document.getElementById('importInput').addEventListener('change',async e=>{
  }catch(err){status(err.message||'Could not import backup.')}finally{e.target.value=''}
 });
 const pinToggle=document.getElementById('showPinNames');pinToggle.checked=showPinNames;pinToggle.addEventListener('change',()=>{showPinNames=pinToggle.checked;localStorage.setItem('miShowPinNames',String(showPinNames));render()});
+function isStandaloneApp(){return window.navigator.standalone===true || window.matchMedia('(display-mode: standalone)').matches;}
+function autoPrintFromBrowser(){
+ const params=new URLSearchParams(location.search);
+ if(!params.has('printData'))return;
+ document.title='AWS STORE LOCATOR — Print';
+ // Hide editing controls even before the browser's print preview is opened.
+ document.body.classList.add('print-view');
+ setTimeout(()=>{map.invalidateSize(true);window.focus();try{window.print()}catch(e){status('Tap Share in Safari, then choose Print.')}},1800);
+}
 window.printPDF=()=>{
- // Call print directly inside the tap handler. Delaying it with requestAnimationFrame
- // can cause iOS in-app browsers to ignore the print request.
  try{
-  if(typeof window.print!=='function'){
-   status('Printing is not supported in this browser. Open this page in Safari, tap Share, then Print.');
+  map.invalidateSize(true);
+  if(isStandaloneApp()){
+   // iOS Home Screen web apps do not reliably support window.print().
+   // Open a browser print copy and pass the location list because standalone
+   // app storage may not be shared with Safari.
+   const data=btoa(unescape(encodeURIComponent(JSON.stringify(stores))));
+   const url=new URL(location.href);url.searchParams.set('printData',data);url.searchParams.set('printView','1');
+   status('Opening a print copy in your browser…');
+   const opened=window.open(url.toString(),'_blank');
+   if(!opened){status('iPhone blocked the new window. Tap Share → Open in Safari, then tap Print / Save PDF.');}
    return;
   }
-  map.invalidateSize(true);
-  status('Opening print options…');
-  window.print();
- }catch(err){
-  status('If print options do not appear, open this page in Safari, tap Share, then Print.');
- }
+  status('Preparing the one-page landscape print layout…');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{try{window.focus();window.print();}catch(err){status('Use Safari Share → Print.')}}));
+ }catch(err){status('Use Safari Share → Print to print this map.');}
 };
+window.addEventListener('load',autoPrintFromBrowser);
 
 function photoTx(mode, work){
  return new Promise(async (resolve,reject)=>{
