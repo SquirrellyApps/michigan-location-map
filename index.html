@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" sizes="512x512" href="./seal-gentleman-512.png">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>Michigan Store Location Manager</title>
+<title>AWS STORE LOCATOR</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{--navy:#17364f;--blue:#2477b7;--line:#d6dee6;--muted:#617282;--bg:#f4f7fa;--red:#a52b32}
@@ -58,6 +58,8 @@ main.workspace{max-width:none;margin:0;padding:12px;grid-template-columns:minmax
 @media(max-width:900px){main.workspace{grid-template-columns:1fr;padding:8px;gap:8px}#map{height:55vh;min-height:320px}.sidecolumn #directory{max-height:45vh;min-height:120px}.sidecolumn .entry{grid-template-columns:1fr}.formrow{grid-template-columns:1fr}.photoarea{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media print{
  @page{size:landscape;margin:5mm}
+ *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+ body.printing{background:#fff!important}
  html,body{width:100%;height:auto;background:#fff!important;margin:0!important;padding:0!important;overflow:visible!important}
  header,.entry,.note,.status,footer,.tools,.locbuttons,.modalback{display:none!important}
  main.workspace{display:grid!important;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr)!important;gap:5mm!important;margin:0!important;padding:0!important;align-items:start}
@@ -74,7 +76,7 @@ main.workspace{max-width:none;margin:0;padding:12px;grid-template-columns:minmax
 </style>
 </head>
 <body>
-<header><div class="header-brand"><img class="header-logo" src="./seal-gentleman-512.png" alt="Seal gentleman app logo"><div><h1>Michigan Location Map</h1><div style="font-size:12px;color:#dce7ef">Lower Peninsula · county boundaries · numbered locations</div></div></div><div class="header-actions"><label class="pin-toggle"><input id="showPinNames" type="checkbox" checked> Show pin names</label><button onclick="printPDF()">Print / Save PDF</button></div></header>
+<header><div class="header-brand"><img class="header-logo" src="./seal-gentleman-512.png" alt="Seal gentleman app logo"><div><h1>AWS STORE LOCATOR</h1><div style="font-size:12px;color:#dce7ef">Lower Peninsula · county boundaries · numbered locations</div></div></div><div class="header-actions"><label class="pin-toggle"><input id="showPinNames" type="checkbox" checked> Show pin names</label><button onclick="printPDF()">Print / Save PDF</button></div></header>
 <main class="workspace">
  <section class="panel" id="mapPanel"><div id="map" aria-label="Michigan Lower Peninsula county map"></div></section>
  <aside class="sidecolumn">
@@ -107,7 +109,7 @@ main.workspace{max-width:none;margin:0;padding:12px;grid-template-columns:minmax
 <script>
 const DB_NAME='miStoreLocationManager', DB_VERSION=1, STORE_KEY='miStoreLocationsV2';
 const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([43.55,-84.8],6);
-window.addEventListener('resize',()=>map.invalidateSize());window.addEventListener('beforeprint',()=>map.invalidateSize());
+window.addEventListener('resize',()=>map.invalidateSize());window.addEventListener('beforeprint',()=>{map.invalidateSize();document.body.classList.add('printing');});window.addEventListener('afterprint',()=>document.body.classList.remove('printing'));
 const countyLayer=L.layerGroup().addTo(map), markerLayer=L.layerGroup().addTo(map);
 let stores=[], db, editingId=null, countyReady=false;
 let showPinNames=localStorage.getItem('miShowPinNames')!=='false';
@@ -165,7 +167,7 @@ document.getElementById('importInput').addEventListener('change',async e=>{const
 const pinToggle=document.getElementById('showPinNames');
 pinToggle.checked=showPinNames;
 pinToggle.addEventListener('change',()=>{showPinNames=pinToggle.checked;localStorage.setItem('miShowPinNames',String(showPinNames));render();});
-window.printPDF=()=>{status('In the print dialog, choose Landscape and “Fit to page” or “Fit to printable area.”');window.print();};
+window.printPDF=()=>{try{map.invalidateSize(true);status('Opening print options… Choose Landscape and Fit to page if available.');if(typeof window.print!=='function'){status('Printing is not supported in this browser view. Open this app in Safari, then use Share → Print.');return;}window.print();}catch(err){status('Print could not open here. Open this app in Safari, then use Share → Print.');}};
 (async()=>{
  try{
   db=await openDB();loadStores();render();
