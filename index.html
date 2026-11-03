@@ -47,27 +47,12 @@ footer{font-size:11px;color:#687987;padding:12px}
 .popup-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.popup-actions button{font-size:12px;padding:7px 9px}
 @media(max-width:600px){.photoarea{grid-template-columns:1fr}.photocard{display:grid;grid-template-columns:120px minmax(0,1fr)}.photocard img,.photo-placeholder{height:120px!important}.header-logo{width:40px;height:40px}h1{font-size:17px}}
 @media(max-width:900px){main.workspace{grid-template-columns:1fr;padding:8px;gap:8px}#map{height:55vh;min-height:320px}.sidecolumn #directory{max-height:45vh;min-height:120px}.entry{grid-template-columns:1fr}.header-actions{gap:8px}}
-@media print{
- @page{size:landscape;margin:5mm}
- *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
- html,body{width:100%;height:auto;background:#fff!important;margin:0!important;padding:0!important;overflow:visible!important}
- header,.entry,.note,.status,footer,.tools,.locbuttons,.photo-modal{display:none!important}
- main.workspace{display:grid!important;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr)!important;gap:5mm!important;margin:0!important;padding:0!important;align-items:start}
- #mapPanel{display:block!important;grid-column:1;min-width:0;border:1px solid #aaa;border-radius:0;box-shadow:none;overflow:hidden}
- #map{height:185mm!important;min-height:0!important;width:100%!important}
- .sidecolumn{display:block!important;grid-column:2;min-width:0}
- .sidecolumn .panel{border:1px solid #aaa;border-radius:0;box-shadow:none;overflow:visible;margin-bottom:3mm}
- .sidecolumn .panelhead{padding:3px 5px}.sidecolumn .panelhead strong{font-size:10px}
- .sidecolumn #directory{max-height:none!important;min-height:0!important;overflow:visible!important;padding:2px 5px}
- .loc{padding:2px 0;grid-template-columns:17px minmax(0,1fr);gap:4px;break-inside:avoid}
- .num{width:15px;height:15px;font-size:8px}.locname{font-size:8px}.address{font-size:7px;line-height:1.1;overflow-wrap:anywhere}
-}
 </style>
 </head>
 <body>
 <header>
  <div class="header-brand"><img class="header-logo" src="./seal-gentleman-512.png" alt="Seal gentleman app logo"><h1>AWS STORE LOCATOR</h1></div>
- <div class="header-actions"><label class="pin-toggle"><input id="showPinNames" type="checkbox" checked> Show pin names</label><button onclick="printPDF()">Print / Save PDF</button></div>
+ <div class="header-actions"><label class="pin-toggle"><input id="showPinNames" type="checkbox" checked> Show pin names</label></div>
 </header>
 <main class="workspace">
  <section class="panel" id="mapPanel"><div id="map" aria-label="Michigan Lower Peninsula county map"></div></section>
@@ -118,7 +103,6 @@ const photoReady = new Promise((resolve,reject)=>{
 const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([43.55,-84.8],6);
 const countyLayer=L.layerGroup().addTo(map),markerLayer=L.layerGroup().addTo(map);
 window.addEventListener('resize',()=>map.invalidateSize());
-window.addEventListener('beforeprint',()=>{map.invalidateSize(true);});
 let stores=[],showPinNames=localStorage.getItem('miShowPinNames')!=='false';
 const statusEl=document.getElementById('status');
 const status=m=>statusEl.textContent=m;
@@ -173,18 +157,7 @@ document.getElementById('importInput').addEventListener('change',async e=>{
  }catch(err){status(err.message||'Could not import backup.')}finally{e.target.value=''}
 });
 const pinToggle=document.getElementById('showPinNames');pinToggle.checked=showPinNames;pinToggle.addEventListener('change',()=>{showPinNames=pinToggle.checked;localStorage.setItem('miShowPinNames',String(showPinNames));render()});
-window.printPDF=()=>{
- try{
-  map.invalidateSize(true);
-  status('Preparing the one-page landscape print layout…');
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-   try{
-    if(typeof window.print==='function'){window.focus();window.print();status('If no print sheet appears, open this page in Safari and use Share → Print.')}
-    else status('Printing is unavailable in this browser. Open this page in Safari and use Share → Print.');
-   }catch(err){status('Open this page in Safari, then use Share → Print.')}
-  }));
- }catch(err){status('Open this page in Safari, then use Share → Print.')}
-};
+
 
 function photoTx(mode, work){
  return new Promise(async (resolve,reject)=>{
