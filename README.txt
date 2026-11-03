@@ -1,28 +1,24 @@
-Michigan Location Map — iPhone-compatible hosting package
+# Michigan Store Location Manager — single-user update
 
-WHY THE MAP MAY LOOK BLANK
-The ChatGPT/iOS file preview does not reliably run interactive HTML/JavaScript apps. This map uses Leaflet, online map tiles, and address geocoding, so it needs to run in a full browser or be hosted as a website.
+## What this version does
+- Flat white Lower Peninsula map with county boundaries and county labels.
+- Address search and numbered location pins.
+- Location directory with edit/delete controls.
+- Three photo categories per location: Building, Setup location, Storage location.
+- Uses the device camera or photo library for images on supported phones.
+- One-page landscape print/PDF of the map and directory (photos are excluded).
+- JSON backup and restore, including photos.
+- Attempts to migrate old `miLocationPins` entries from this browser automatically.
 
-QUICKEST TRY ON IPHONE
-1. Download michigan_location_map.html to the Files app.
-2. If tapping it opens a static preview, use Share > Open in Safari if that option is offered.
-3. If it still does not run, host the file as a website using the steps below.
+## Important storage note
+This is the single-user, browser-local version. Locations are saved in browser localStorage and photos in browser IndexedDB on this device/browser only. They are not automatically synchronized to another device or shared with other users. Use **Export backup** regularly.
 
-HOST IT WITH GITHUB PAGES
-1. On GitHub, create a new public repository named michigan-location-map.
-2. Upload michigan_location_map.html and rename it to index.html.
-3. Open the repository's Settings > Pages.
-4. Under Build and deployment, choose Deploy from a branch, select the main branch and /(root), then Save.
-5. Wait for GitHub Pages to publish; the site URL will look like https://YOUR-USERNAME.github.io/michigan-location-map/
-6. Open that website in Safari. Add the site to your Home Screen if desired.
+## Update GitHub Pages
+1. Download and unzip this package.
+2. Open the `michigan-location-map` repository on GitHub.
+3. Open the repository's root folder on the `main` branch.
+4. Replace `index.html` with the `index.html` in this ZIP (or upload the replacement and commit it).
+5. Commit the change. GitHub Pages should publish it after its normal build delay.
+6. Open the live page in Safari and refresh. If it still shows the old app, try a private tab or clear the site's cached data.
 
-FEATURES
-- Starts with no pins.
-- Add a location name and address to geocode and create a labeled pin.
-- County boundaries and county labels are loaded from public GeoJSON data.
-- Location directory, remove pin, CSV export, and print/save as PDF.
-- Pins are saved in the browser's local storage. They are specific to that browser/device unless exported.
-
-NOTES
-- Requires internet access for Leaflet, map tiles, county GeoJSON, and address lookup.
-- When printing, choose Landscape and fit to one page.
+No secret keys or admin controls are included. The app uses public CDN and public county GeoJSON data, plus OpenStreetMap Nominatim for address search.
