@@ -39,6 +39,7 @@ label{font-size:12px;color:#526474;font-weight:650;display:block;margin:0 0 5px}
 body{background:#f4f7fa}
 header{padding:10px 14px}
 header h1{font-size:19px}
+.header-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.pin-toggle{display:flex;align-items:center;gap:6px;color:#fff;margin:0;font-size:13px;white-space:nowrap}.pin-toggle input{width:auto;margin:0;accent-color:#fff}
 main.workspace{max-width:none;margin:0;padding:12px;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);align-items:start}
 #mapPanel{border:1px solid var(--line);border-radius:10px;box-shadow:none;overflow:hidden}
 #map{height:calc(100vh - 92px);min-height:520px;background:#fff}
@@ -67,12 +68,12 @@ main.workspace{max-width:none;margin:0;padding:12px;grid-template-columns:minmax
 </style>
 </head>
 <body>
-<header><div><h1>Michigan Location Map</h1><div style="font-size:12px;color:#dce7ef">Lower Peninsula · county boundaries · numbered locations</div></div><button onclick="printPDF()">Print / Save PDF</button></header>
+<header><div><h1>Michigan Location Map</h1><div style="font-size:12px;color:#dce7ef">Lower Peninsula · county boundaries · numbered locations</div></div><div class="header-actions"><label class="pin-toggle"><input id="showPinNames" type="checkbox" checked> Show pin names</label><button onclick="printPDF()">Print / Save PDF</button></div></header>
 <main class="workspace">
  <section class="panel" id="mapPanel"><div id="map" aria-label="Michigan Lower Peninsula county map"></div></section>
  <aside class="sidecolumn">
   <section class="panel">
-   <form id="addForm" class="entry"><input id="storeName" placeholder="Store / event location name" required maxlength="120"><input id="storeAddress" placeholder="Full street address, city, MI ZIP" required maxlength="300"><button id="addBtn" type="submit">＋ Add location</button></form>
+   <form id="addForm" class="entry"><input id="storeCode" placeholder="Store code (e.g. FFHH)" maxlength="40"><input id="storeName" placeholder="Store / event location name" required maxlength="120"><input id="storeAddress" placeholder="Full street address, city, MI ZIP" required maxlength="300"><button id="addBtn" type="submit">＋ Add location</button></form>
    <div class="note">Locations and photos are saved in this browser on this device. Export backups regularly. The PDF includes the map and directory only, not photos.</div>
    <div id="status" class="status" aria-live="polite">Loading county boundaries…</div>
   </section>
@@ -86,7 +87,7 @@ main.workspace{max-width:none;margin:0;padding:12px;grid-template-columns:minmax
   <div class="modalhead"><strong id="editTitle">Edit location</strong><button class="secondary" onclick="closeEditor()">Close</button></div>
   <form id="editForm">
    <div class="modalbody">
-    <div class="formrow"><div><label for="editName">Location name</label><input id="editName" required maxlength="120"></div><div><label for="editAddress">Address</label><input id="editAddress" required maxlength="300"></div></div>
+    <div class="formrow"><div><label for="editCode">Store code</label><input id="editCode" maxlength="40" placeholder="e.g. FFHH"></div><div><label for="editName">Location name</label><input id="editName" required maxlength="120"></div><div><label for="editAddress">Address</label><input id="editAddress" required maxlength="300"></div></div>
     <div><label>Location photos</label><div class="small">Add one photo for each category. Use the iPhone camera option or choose a photo from your library. Photos are stored locally in this browser.</div></div>
     <div class="photoarea" id="photoArea"></div>
     <div><label for="photoCategory">Photo category</label><select id="photoCategory"><option value="building">Building</option><option value="setup">Setup location</option><option value="storage">Storage location</option></select></div>
@@ -103,6 +104,7 @@ const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([43.55,-84.8
 window.addEventListener('resize',()=>map.invalidateSize());window.addEventListener('beforeprint',()=>map.invalidateSize());
 const countyLayer=L.layerGroup().addTo(map), markerLayer=L.layerGroup().addTo(map);
 let stores=[], db, editingId=null, countyReady=false;
+let showPinNames=localStorage.getItem('miShowPinNames')!=='false';
 const statusEl=document.getElementById('status');
 const status=m=>{statusEl.textContent=m;const ps=document.getElementById('photoStatus');if(ps&&m)ps.textContent=m;};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -120,24 +122,29 @@ function persist(){localStorage.setItem(STORE_KEY,JSON.stringify(stores));}
 function pinIcon(n){return L.divIcon({className:'',html:`<div style="width:28px;height:28px;border:2px solid white;border-radius:50%;background:#2477b7;color:white;display:grid;place-items:center;font-weight:800;box-shadow:0 1px 5px #0006">${n}</div>`,iconSize:[28,28],iconAnchor:[14,14]});}
 function render(){
  markerLayer.clearLayers();
- stores.forEach((s,i)=>{const m=L.marker([s.lat,s.lon],{icon:pinIcon(i+1)}).addTo(markerLayer);m.bindTooltip(esc(s.name),{permanent:true,direction:'top',offset:[0,-12]});m.bindPopup(`<b>${esc(s.name)}</b><br>${esc(s.address)}`);});
+ stores.forEach((s,i)=>{
+  const m=L.marker([s.lat,s.lon],{icon:pinIcon(i+1)}).addTo(markerLayer);
+  const code=(s.code||(/family farm and home/i.test(s.name||'') && /hastings/i.test((s.name||'')+' '+(s.address||''))?'FFHH':'')).trim();
+  if(showPinNames)m.bindTooltip(esc(code||s.name),{permanent:true,direction:'top',offset:[0,-12]});
+  m.bindPopup(`<b>${esc(code?code+' — ':'')}${esc(s.name)}</b><br>${esc(s.address)}`);
+ });
  document.getElementById('count').textContent=stores.length;
  const dir=document.getElementById('directory');
  if(!stores.length){dir.innerHTML='<div class="empty">No locations yet. Add a named address above.</div>';return;}
- dir.innerHTML=stores.map((s,i)=>`<article class="loc"><div class="num">${i+1}</div><div><div class="locname">${esc(s.name)}</div><div class="address">${esc(s.address)}</div><div class="locbuttons"><button class="secondary" onclick="focusStore('${s.id}')">Show on map</button><button class="secondary" onclick="openEditor('${s.id}')">Edit / Photos</button></div></div></article>`).join('');
+ dir.innerHTML=stores.map((s,i)=>`<article class="loc"><div class="num">${i+1}</div><div><div class="locname">${esc((s.code||(/family farm and home/i.test(s.name||'')&&/hastings/i.test((s.name||'')+' '+(s.address||''))?'FFHH':'')) ? (s.code||'FFHH')+' — ' : '')}${esc(s.name)}</div><div class="address">${esc(s.address)}</div><div class="locbuttons"><button class="secondary" onclick="focusStore('${s.id}')">Show on map</button><button class="secondary" onclick="openEditor('${s.id}')">Edit / Photos</button></div></div></article>`).join('');
 }
 window.focusStore=storeId=>{const s=stores.find(x=>x.id===storeId);if(s){map.setView([s.lat,s.lon],Math.max(map.getZoom(),9));markerLayer.eachLayer(m=>{if(Math.abs(m.getLatLng().lat-s.lat)<1e-7&&Math.abs(m.getLatLng().lng-s.lon)<1e-7)m.openPopup()});}};
 document.getElementById('addForm').addEventListener('submit',async e=>{
- e.preventDefault();const name=document.getElementById('storeName').value.trim(),address=document.getElementById('storeAddress').value.trim();if(!name||!address)return;
+ e.preventDefault();const code=document.getElementById('storeCode').value.trim(),name=document.getElementById('storeName').value.trim(),address=document.getElementById('storeAddress').value.trim();if(!name||!address)return;
  const btn=document.getElementById('addBtn');btn.disabled=true;status('Finding address…');
- try{const q=/\b(MI|Michigan)\b/i.test(address)?address:address+', Michigan';const url='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=us&q='+encodeURIComponent(q);const res=await fetch(url,{headers:{'Accept-Language':'en'}});if(!res.ok)throw Error('Address lookup is temporarily unavailable.');const data=await res.json();if(!data.length)throw Error('Address not found. Include city, state, and ZIP.');const hit=data[0],lat=+hit.lat,lon=+hit.lon;if(!(lat>=41.6&&lat<=48.4&&lon>=-90.5&&lon<=-82.1))throw Error('That address does not appear to be in Michigan.');const s={id:id(),name,address,lat,lon,createdAt:new Date().toISOString()};stores.push(s);persist();render();map.setView([lat,lon],Math.max(map.getZoom(),8));document.getElementById('storeName').value='';document.getElementById('storeAddress').value='';status('Added '+name+'.');}
+ try{const q=/\b(MI|Michigan)\b/i.test(address)?address:address+', Michigan';const url='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=us&q='+encodeURIComponent(q);const res=await fetch(url,{headers:{'Accept-Language':'en'}});if(!res.ok)throw Error('Address lookup is temporarily unavailable.');const data=await res.json();if(!data.length)throw Error('Address not found. Include city, state, and ZIP.');const hit=data[0],lat=+hit.lat,lon=+hit.lon;if(!(lat>=41.6&&lat<=48.4&&lon>=-90.5&&lon<=-82.1))throw Error('That address does not appear to be in Michigan.');const finalCode=code||(/family farm and home/i.test(name+' '+address)&&/hastings/i.test(name+' '+address)?'FFHH':'');const s={id:id(),code:finalCode,name,address,lat,lon,createdAt:new Date().toISOString()};stores.push(s);persist();render();map.setView([lat,lon],Math.max(map.getZoom(),8));document.getElementById('storeCode').value='';document.getElementById('storeName').value='';document.getElementById('storeAddress').value='';status('Added '+name+'.');}
  catch(err){status(err.message||'Could not find the address.');}finally{btn.disabled=false;}
 });
-window.openEditor=async storeId=>{const s=stores.find(x=>x.id===storeId);if(!s)return;editingId=storeId;document.getElementById('editName').value=s.name;document.getElementById('editAddress').value=s.address;document.getElementById('editTitle').textContent='Edit: '+s.name;document.getElementById('editBack').style.display='flex';await renderPhotos();};
+window.openEditor=async storeId=>{const s=stores.find(x=>x.id===storeId);if(!s)return;editingId=storeId;document.getElementById('editCode').value=s.code||(/family farm and home/i.test(s.name||'')&&/hastings/i.test((s.name||'')+' '+(s.address||''))?'FFHH':'');document.getElementById('editName').value=s.name;document.getElementById('editAddress').value=s.address;document.getElementById('editTitle').textContent='Edit: '+s.name;document.getElementById('editBack').style.display='flex';await renderPhotos();};
 window.closeEditor=()=>{document.getElementById('editBack').style.display='none';editingId=null;document.getElementById('photoInput').value='';document.getElementById('cameraInput').value='';};
 window.choosePhotoLibrary=()=>document.getElementById('photoInput').click();
 window.takePhoto=()=>document.getElementById('cameraInput').click();
-document.getElementById('editForm').addEventListener('submit',e=>{e.preventDefault();const s=stores.find(x=>x.id===editingId);if(!s)return;s.name=document.getElementById('editName').value.trim();s.address=document.getElementById('editAddress').value.trim();persist();render();closeEditor();status('Location updated.');});
+document.getElementById('editForm').addEventListener('submit',e=>{e.preventDefault();const s=stores.find(x=>x.id===editingId);if(!s)return;s.code=document.getElementById('editCode').value.trim();s.name=document.getElementById('editName').value.trim();s.address=document.getElementById('editAddress').value.trim();if(!s.code&&/family farm and home/i.test(s.name+' '+s.address)&&/hastings/i.test(s.name+' '+s.address))s.code='FFHH';persist();render();closeEditor();status('Location updated.');});
 window.deleteCurrent=async()=>{const s=stores.find(x=>x.id===editingId);if(!s||!confirm('Delete '+s.name+' and its photos from this browser?'))return;for(const p of await getPhotos(s.id))await deletePhoto(p.id);stores=stores.filter(x=>x.id!==s.id);persist();render();closeEditor();status('Location deleted.');};
 async function renderPhotos(){const area=document.getElementById('photoArea');const photos=await getPhotos(editingId);const cats=[['building','Building'],['setup','Setup location'],['storage','Storage location']];area.innerHTML=cats.map(([key,label])=>{const p=photos.find(x=>x.category===key);return `<div class="photocard">${p?`<img src="${URL.createObjectURL(p.blob)}" alt="${label} photo">`:'<div style="height:125px;display:grid;place-items:center;color:#7a8b98;background:#f0f3f5;font-size:12px">No photo yet</div>'}<div class="phototext"><b>${label}</b><br><span class="small">${p?esc(p.name):'Not added'}</span>${p?`<br><button class="danger" onclick="removePhoto('${p.id}')">Remove photo</button>`:''}</div></div>`;}).join('');}
 window.removePhoto=async photoId=>{await deletePhoto(photoId);await renderPhotos();status('Photo removed.');};
@@ -149,6 +156,9 @@ function blobToDataURL(blob){return new Promise((resolve,reject)=>{const r=new F
 function dataURLtoBlob(data){const [head,body]=data.split(',');const mime=(head.match(/data:(.*?);base64/)||[])[1]||'image/jpeg';const bin=atob(body),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return new Blob([bytes],{type:mime});}
 function downloadFile(content,name,type){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
 document.getElementById('importInput').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const payload=JSON.parse(await file.text());if(payload.format!=='michigan-store-location-manager-backup-v1'||!Array.isArray(payload.stores))throw Error('This file is not a supported backup.');if(!confirm('Import backup and replace the locations and photos currently saved in this browser?'))return;const tx=db.transaction('photos','readwrite');tx.objectStore('photos').clear();await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});stores=payload.stores;persist();for(const p of (payload.photos||[])){await savePhoto({id:p.id,storeId:p.storeId,category:p.category,name:p.name,addedAt:p.addedAt,blob:dataURLtoBlob(p.data)});}render();status('Backup imported.');}catch(err){status(err.message||'Could not import backup.');}finally{e.target.value='';}});
+const pinToggle=document.getElementById('showPinNames');
+pinToggle.checked=showPinNames;
+pinToggle.addEventListener('change',()=>{showPinNames=pinToggle.checked;localStorage.setItem('miShowPinNames',String(showPinNames));render();});
 window.printPDF=()=>{status('In the print dialog, choose Landscape and “Fit to page” or “Fit to printable area.”');window.print();};
 (async()=>{
  try{
