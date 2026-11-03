@@ -101,6 +101,12 @@ const photoReady = new Promise((resolve,reject)=>{
  }catch(e){reject(e)}
 });
 const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([43.55,-84.8],6);
+// Detailed street-map baselayer with neighborhood roads, labels, parks and water,
+// styled to approximate the clean, colorful Apple Maps look in the reference.
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+ maxZoom:20,subdomains:'abcd',
+ attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+}).addTo(map);
 const countyLayer=L.layerGroup().addTo(map),markerLayer=L.layerGroup().addTo(map);
 window.addEventListener('resize',()=>map.invalidateSize());
 let stores=[],showPinNames=localStorage.getItem('miShowPinNames')!=='false';
@@ -261,7 +267,7 @@ window.openAppleMaps=storeId=>{
   const upperPeninsulaFips=new Set(['26003','26013','26033','26041','26043','26053','26061','26071','26083','26095','26103','26109','26131','26153','26097']);
   const features=geo.features.filter(f=>{const fips=String(f.id||f.properties?.GEO_ID||'').replace(/\D/g,'').slice(-5);return fips.startsWith('26')&&!upperPeninsulaFips.has(fips)});
   if(!features.length)throw Error('No Michigan counties found');
-  L.geoJSON({type:'FeatureCollection',features},{style:{color:'#5c7180',weight:1.05,opacity:1,fillColor:'#f8fbfd',fillOpacity:1},interactive:false}).addTo(countyLayer);
+  L.geoJSON({type:'FeatureCollection',features},{style:{color:'#6b8795',weight:1.15,opacity:0.82,fillOpacity:0},interactive:false}).addTo(countyLayer);
   map.fitBounds(L.geoJSON({type:'FeatureCollection',features}).getBounds(),{padding:[12,12]});status(stores.length?`Map ready. ${stores.length} saved location(s) loaded.`:'Map ready. Add your first location.');
  }catch(err){status('The app opened, but county boundaries did not load. Check the internet connection and reload.')}
 })();
