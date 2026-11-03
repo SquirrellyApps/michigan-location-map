@@ -1,0 +1,11 @@
+{
+  "name": "Michigan Store Location Manager",
+  "short_name": "Store Locator",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f7fa",
+  "theme_color": "#0645d8",
+  "icons": [
+    { "src": "./seal-gentleman-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0645d8">
+<link rel="icon" type="image/png" sizes="512x512" href="./seal-gentleman-512.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<link rel="manifest" href="./manifest.webmanifest">
 <title>Michigan Store Location Manager</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
@@ -38,6 +42,8 @@ label{font-size:12px;color:#526474;font-weight:650;display:block;margin:0 0 5px}
 
 body{background:#f4f7fa}
 header{padding:10px 14px}
+.header-brand{display:flex;align-items:center;gap:11px;min-width:0}
+.header-logo{width:48px;height:48px;object-fit:cover;border-radius:12px;flex:none}
 header h1{font-size:19px}
 .header-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.pin-toggle{display:flex;align-items:center;gap:6px;color:#fff;margin:0;font-size:13px;white-space:nowrap}.pin-toggle input{width:auto;margin:0;accent-color:#fff}
 main.workspace{max-width:none;margin:0;padding:12px;grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);align-items:start}
@@ -68,7 +74,7 @@ main.workspace{max-width:none;margin:0;padding:12px;grid-template-columns:minmax
 </style>
 </head>
 <body>
-<header><div><h1>Michigan Location Map</h1><div style="font-size:12px;color:#dce7ef">Lower Peninsula · county boundaries · numbered locations</div></div><div class="header-actions"><label class="pin-toggle"><input id="showPinNames" type="checkbox" checked> Show pin names</label><button onclick="printPDF()">Print / Save PDF</button></div></header>
+<header><div class="header-brand"><img class="header-logo" src="./seal-gentleman-512.png" alt="Seal gentleman app logo"><div><h1>Michigan Location Map</h1><div style="font-size:12px;color:#dce7ef">Lower Peninsula · county boundaries · numbered locations</div></div></div><div class="header-actions"><label class="pin-toggle"><input id="showPinNames" type="checkbox" checked> Show pin names</label><button onclick="printPDF()">Print / Save PDF</button></div></header>
 <main class="workspace">
  <section class="panel" id="mapPanel"><div id="map" aria-label="Michigan Lower Peninsula county map"></div></section>
  <aside class="sidecolumn">
