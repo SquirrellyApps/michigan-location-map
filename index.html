@@ -33,12 +33,25 @@ input{width:100%;padding:10px 11px;border:1px solid #cbd5df;border-radius:8px;fo
 .locname{font-size:14px;font-weight:750;overflow-wrap:anywhere}.address{font-size:12px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
 .locbuttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.locbuttons button{padding:6px 8px;font-size:11px}
 footer{font-size:11px;color:#687987;padding:12px}
+.photo-modal{position:fixed;inset:0;background:#102638aa;z-index:5000;display:none;align-items:center;justify-content:center;padding:12px}
+.photo-modal.open{display:flex}.photo-dialog{width:min(760px,100%);max-height:92vh;overflow:auto;background:white;border-radius:14px;box-shadow:0 12px 45px #0005}
+.photo-dialog-head{position:sticky;top:0;background:white;border-bottom:1px solid var(--line);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:1}
+.photo-dialog-head h2{font-size:17px;margin:0}.photo-dialog-body{padding:14px 16px}
+.photoarea{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.photocard{border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:0}
+.photocard img{width:100%;height:150px;object-fit:cover;display:block;background:#eef2f4}
+.phototext{padding:8px;font-size:12px;overflow-wrap:anywhere}.phototext button{margin-top:7px;padding:6px 8px;font-size:11px}
+.photo-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+#photoInput,#cameraInput{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.photo-status{font-size:12px;color:var(--muted);min-height:24px}
+.popup-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.popup-actions button{font-size:12px;padding:7px 9px}
+@media(max-width:600px){.photoarea{grid-template-columns:1fr}.photocard{display:grid;grid-template-columns:120px minmax(0,1fr)}.photocard img,.photo-placeholder{height:120px!important}.header-logo{width:40px;height:40px}h1{font-size:17px}}
 @media(max-width:900px){main.workspace{grid-template-columns:1fr;padding:8px;gap:8px}#map{height:55vh;min-height:320px}.sidecolumn #directory{max-height:45vh;min-height:120px}.entry{grid-template-columns:1fr}.header-actions{gap:8px}}
 @media print{
  @page{size:landscape;margin:5mm}
  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
  html,body{width:100%;height:auto;background:#fff!important;margin:0!important;padding:0!important;overflow:visible!important}
- header,.entry,.note,.status,footer,.tools,.locbuttons{display:none!important}
+ header,.entry,.note,.status,footer,.tools,.locbuttons,.photo-modal{display:none!important}
  main.workspace{display:grid!important;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr)!important;gap:5mm!important;margin:0!important;padding:0!important;align-items:start}
  #mapPanel{display:block!important;grid-column:1;min-width:0;border:1px solid #aaa;border-radius:0;box-shadow:none;overflow:hidden}
  #map{height:185mm!important;min-height:0!important;width:100%!important}
@@ -73,9 +86,35 @@ footer{font-size:11px;color:#687987;padding:12px}
   <footer>County boundaries are shown without county names. Location data stays in this browser unless you export a backup.</footer>
  </aside>
 </main>
+<div class="photo-modal" id="photoModal" role="dialog" aria-modal="true" aria-labelledby="photoTitle">
+ <div class="photo-dialog">
+  <div class="photo-dialog-head"><h2 id="photoTitle">Location photos</h2><button class="secondary" type="button" onclick="closePhotoEditor()">Close</button></div>
+  <div class="photo-dialog-body">
+   <div class="note" style="padding:0">Photos save automatically in this browser on this device. Add one photo for each category.</div>
+   <div class="photoarea" id="photoArea"></div>
+   <label for="photoCategory" style="display:block;font-size:12px;font-weight:700;margin-top:8px">Photo category</label>
+   <select id="photoCategory" style="width:100%;padding:10px;border:1px solid #cbd5df;border-radius:8px;font:inherit">
+    <option value="building">Building</option><option value="setup">Setup location</option><option value="storage">Storage location</option>
+   </select>
+   <div class="photo-actions"><button type="button" onclick="choosePhotoLibrary()">Choose from Photos</button><button type="button" onclick="takePhoto()">Take Photo</button></div>
+   <input id="photoInput" type="file" accept="image/*"><input id="cameraInput" type="file" accept="image/*" capture="environment">
+   <div id="photoStatus" class="photo-status" aria-live="polite">Choose a category, then select or take a photo. It saves immediately.</div>
+  </div>
+ </div>
+</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const STORE_KEY='miStoreLocationsV2';
+const PHOTO_DB='awsStoreLocatorPhotos', PHOTO_DB_VERSION=1;
+let photoDB=null, editingPhotoStoreId=null, activeObjectUrls=[];
+const photoReady = new Promise((resolve,reject)=>{
+ try{
+  const req=indexedDB.open(PHOTO_DB,PHOTO_DB_VERSION);
+  req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('photos'))req.result.createObjectStore('photos',{keyPath:'id'});};
+  req.onsuccess=()=>{photoDB=req.result;resolve(photoDB);};
+  req.onerror=()=>reject(req.error||new Error('Photo storage unavailable'));
+ }catch(e){reject(e)}
+});
 const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([43.55,-84.8],6);
 const countyLayer=L.layerGroup().addTo(map),markerLayer=L.layerGroup().addTo(map);
 window.addEventListener('resize',()=>map.invalidateSize());
@@ -93,32 +132,155 @@ function pinIcon(n){return L.divIcon({className:'',html:`<div style="width:28px;
 function storeCode(s){return (s.code||(/family farm and home/i.test((s.name||'')+' '+(s.address||''))&&/hastings/i.test((s.name||'')+' '+(s.address||''))?'FFHH':'')).trim()}
 function render(){
  markerLayer.clearLayers();
- stores.forEach((s,i)=>{const m=L.marker([s.lat,s.lon],{icon:pinIcon(i+1)}).addTo(markerLayer);if(showPinNames)m.bindTooltip(esc(storeCode(s)||s.name),{permanent:true,direction:'top',offset:[0,-12]});m.bindPopup(`<b>${esc(storeCode(s)?storeCode(s)+' — ':'')}${esc(s.name)}</b><br>${esc(s.address)}`)});
+ stores.forEach((s,i)=>{
+  const m=L.marker([s.lat,s.lon],{icon:pinIcon(i+1)}).addTo(markerLayer);
+  if(showPinNames)m.bindTooltip(esc(storeCode(s)||s.name),{permanent:true,direction:'top',offset:[0,-12]});
+  m.bindPopup(`<b>${esc(storeCode(s)?storeCode(s)+' — ':'')}${esc(s.name)}</b><br><span>${esc(s.address)}</span><div class="popup-actions"><button type="button" onclick="copyStoreAddress('${s.id}')">Copy address</button><button type="button" class="secondary" onclick="openAppleMaps('${s.id}')">Open in Apple Maps</button></div>`);
+ });
  document.getElementById('count').textContent=stores.length;
  const dir=document.getElementById('directory');
  if(!stores.length){dir.innerHTML='<div class="empty">No locations yet. Add a named address above.</div>';return}
- dir.innerHTML=stores.map((s,i)=>`<article class="loc"><div class="num">${i+1}</div><div><div class="locname">${esc(storeCode(s)?storeCode(s)+' — ':'')}${esc(s.name)}</div><div class="address">${esc(s.address)}</div><div class="locbuttons"><button class="secondary" onclick="focusStore('${s.id}')">Show on map</button><button class="secondary" onclick="editStore('${s.id}')">Edit</button><button class="danger" onclick="deleteStore('${s.id}')">Delete</button></div></div></article>`).join('');
+ dir.innerHTML=stores.map((s,i)=>`<article class="loc"><div class="num">${i+1}</div><div><div class="locname">${esc(storeCode(s)?storeCode(s)+' — ':'')}${esc(s.name)}</div><div class="address">${esc(s.address)}</div><div class="locbuttons"><button class="secondary" onclick="focusStore('${s.id}')">Show on map</button><button class="secondary" onclick="editStore('${s.id}')">Edit</button><button class="secondary" onclick="openPhotoEditor('${s.id}')">Photos</button><button class="danger" onclick="deleteStore('${s.id}')">Delete</button></div></div></article>`).join('');
 }
 window.focusStore=storeId=>{const s=stores.find(x=>x.id===storeId);if(s){map.setView([s.lat,s.lon],Math.max(map.getZoom(),9));markerLayer.eachLayer(m=>{if(Math.abs(m.getLatLng().lat-s.lat)<1e-7&&Math.abs(m.getLatLng().lng-s.lon)<1e-7)m.openPopup()})}};
 window.editStore=storeId=>{const s=stores.find(x=>x.id===storeId);if(!s)return;const code=prompt('Store code:',s.code||storeCode(s));if(code===null)return;const name=prompt('Location name:',s.name);if(name===null)return;const address=prompt('Address:',s.address);if(address===null)return;s.code=code.trim();s.name=name.trim();s.address=address.trim();persist();render();status('Location updated.')};
-window.deleteStore=storeId=>{const s=stores.find(x=>x.id===storeId);if(!s||!confirm('Delete '+s.name+'?'))return;stores=stores.filter(x=>x.id!==storeId);persist();render();status('Location deleted.')};
+window.deleteStore=async storeId=>{const s=stores.find(x=>x.id===storeId);if(!s||!confirm('Delete '+s.name+' and its saved photos?'))return;try{await deletePhotosForStore(storeId)}catch(e){}stores=stores.filter(x=>x.id!==storeId);persist();render();status('Location deleted.')};
 document.getElementById('addForm').addEventListener('submit',async e=>{
  e.preventDefault();const code=document.getElementById('storeCode').value.trim(),name=document.getElementById('storeName').value.trim(),address=document.getElementById('storeAddress').value.trim();if(!name||!address)return;
  const btn=document.getElementById('addBtn');btn.disabled=true;status('Finding address…');
  try{const q=/\b(MI|Michigan)\b/i.test(address)?address:address+', Michigan';const url='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=us&q='+encodeURIComponent(q);const res=await fetch(url,{headers:{'Accept-Language':'en'}});if(!res.ok)throw Error('Address lookup is temporarily unavailable.');const data=await res.json();if(!data.length)throw Error('Address not found. Include city, state, and ZIP.');const hit=data[0],lat=+hit.lat,lon=+hit.lon;if(!(lat>=41.6&&lat<=48.4&&lon>=-90.5&&lon<=-82.1))throw Error('That address does not appear to be in Michigan.');stores.push({id:id(),code:code||( /family farm and home/i.test(name+' '+address)&&/hastings/i.test(name+' '+address)?'FFHH':''),name,address,lat,lon,createdAt:new Date().toISOString()});persist();render();map.setView([lat,lon],Math.max(map.getZoom(),8));document.getElementById('storeCode').value='';document.getElementById('storeName').value='';document.getElementById('storeAddress').value='';status('Added '+name+'.')}
  catch(err){status(err.message||'Could not find the address.')}finally{btn.disabled=false}
 });
-window.exportBackup=()=>{const payload={format:'michigan-store-location-manager-backup-v1',exportedAt:new Date().toISOString(),stores};downloadFile(JSON.stringify(payload,null,2),`michigan-location-backup-${new Date().toISOString().slice(0,10)}.json`,'application/json');status('Backup exported.')};
+window.exportBackup=async()=>{
+ try{
+  await photoReady;
+  const photos=await allPhotos(), encoded=[];
+  for(const p of photos)encoded.push({id:p.id,storeId:p.storeId,category:p.category,name:p.name,addedAt:p.addedAt,data:await blobToDataURL(p.blob)});
+  const payload={format:'michigan-store-location-manager-backup-v2',exportedAt:new Date().toISOString(),stores,photos:encoded};
+  downloadFile(JSON.stringify(payload),`aws-store-locator-backup-${new Date().toISOString().slice(0,10)}.json`,'application/json');status('Backup exported, including photos.');
+ }catch(e){status('Backup failed. Try exporting without very large photos.')}
+};
 function downloadFile(content,name,type){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500)}
-document.getElementById('importInput').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const p=JSON.parse(await file.text());if(!Array.isArray(p.stores))throw Error('Unsupported backup file.');if(!confirm('Replace current locations with the backup?'))return;stores=p.stores;persist();render();status('Backup imported.')}catch(err){status(err.message||'Could not import backup.')}finally{e.target.value=''}});
+document.getElementById('importInput').addEventListener('change',async e=>{
+ const file=e.target.files?.[0];if(!file)return;
+ try{
+  const p=JSON.parse(await file.text());if(!Array.isArray(p.stores))throw Error('Unsupported backup file.');
+  if(!confirm('Replace current locations and photos with this backup?'))return;
+  stores=p.stores;persist();await photoReady;
+  await new Promise((resolve,reject)=>{const tx=photoDB.transaction('photos','readwrite');tx.objectStore('photos').clear();tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});
+  for(const ph of (p.photos||[])){if(ph.data)await savePhoto({id:ph.id||id(),storeId:ph.storeId,category:ph.category,name:ph.name||'Photo',addedAt:ph.addedAt||new Date().toISOString(),blob:dataURLtoBlob(ph.data)});}
+  render();status('Backup imported, including any photos.');
+ }catch(err){status(err.message||'Could not import backup.')}finally{e.target.value=''}
+});
 const pinToggle=document.getElementById('showPinNames');pinToggle.checked=showPinNames;pinToggle.addEventListener('change',()=>{showPinNames=pinToggle.checked;localStorage.setItem('miShowPinNames',String(showPinNames));render()});
 window.printPDF=()=>{
  try{
-  if(typeof window.print!=='function'){status('Printing is not supported in this in-app browser. Open this app in Safari, then use Share → Print.');return}
-  map.invalidateSize(true);status('Opening print options…');
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{try{window.print()}catch(err){status('Print could not open here. Open this app in Safari, then use Share → Print.')}}));
- }catch(err){status('Print could not open here. Open this app in Safari, then use Share → Print.')}
+  map.invalidateSize(true);
+  status('Preparing the one-page landscape print layout…');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+   try{
+    if(typeof window.print==='function'){window.focus();window.print();status('If no print sheet appears, open this page in Safari and use Share → Print.')}
+    else status('Printing is unavailable in this browser. Open this page in Safari and use Share → Print.');
+   }catch(err){status('Open this page in Safari, then use Share → Print.')}
+  }));
+ }catch(err){status('Open this page in Safari, then use Share → Print.')}
 };
+
+function photoTx(mode, work){
+ return new Promise(async (resolve,reject)=>{
+  try{await photoReady;const tx=photoDB.transaction('photos',mode),store=tx.objectStore('photos');let value;
+   try{value=work(store)}catch(e){reject(e);return}
+   tx.oncomplete=()=>resolve(value);tx.onerror=()=>reject(tx.error||new Error('Photo storage error'));tx.onabort=()=>reject(tx.error||new Error('Photo storage aborted'));
+  }catch(e){reject(e)}
+ });
+}
+async function allPhotos(){
+ await photoReady;
+ return new Promise((resolve,reject)=>{const req=photoDB.transaction('photos','readonly').objectStore('photos').getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)});
+}
+async function getStorePhotos(storeId){return (await allPhotos()).filter(p=>p.storeId===storeId)}
+async function savePhoto(photo){return photoTx('readwrite',s=>s.put(photo))}
+async function deletePhoto(photoId){return photoTx('readwrite',s=>s.delete(photoId))}
+async function deletePhotosForStore(storeId){for(const p of await getStorePhotos(storeId))await deletePhoto(p.id)}
+function blobToDataURL(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob)})}
+function dataURLtoBlob(data){const parts=data.split(','),mime=(parts[0].match(/:(.*?);/)||[])[1]||'application/octet-stream',binary=atob(parts[1]),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return new Blob([bytes],{type:mime})}
+window.openPhotoEditor=async storeId=>{
+ const s=stores.find(x=>x.id===storeId);if(!s)return;
+ editingPhotoStoreId=storeId;document.getElementById('photoTitle').textContent='Photos — '+(storeCode(s)?storeCode(s)+' · ':'')+s.name;
+ document.getElementById('photoModal').classList.add('open');document.getElementById('photoStatus').textContent='Loading saved photos…';
+ document.getElementById('photoInput').value='';document.getElementById('cameraInput').value='';
+ await renderPhotos();
+};
+window.closePhotoEditor=()=>{document.getElementById('photoModal').classList.remove('open');editingPhotoStoreId=null;document.getElementById('photoInput').value='';document.getElementById('cameraInput').value='';};
+window.choosePhotoLibrary=()=>document.getElementById('photoInput').click();
+window.takePhoto=()=>document.getElementById('cameraInput').click();
+async function renderPhotos(){
+ if(!editingPhotoStoreId)return;
+ const area=document.getElementById('photoArea'), photos=await getStorePhotos(editingPhotoStoreId);
+ activeObjectUrls.forEach(u=>URL.revokeObjectURL(u));activeObjectUrls=[];
+ const cats=[['building','Building'],['setup','Setup location'],['storage','Storage location']];
+ area.innerHTML=cats.map(([key,label])=>{
+  const p=photos.find(x=>x.category===key);
+  if(!p)return `<div class="photocard"><div class="photo-placeholder" style="height:150px;display:grid;place-items:center;color:#7a8b98;background:#f0f3f5;font-size:12px">No photo yet</div><div class="phototext"><b>${label}</b><br><span>Not added</span></div></div>`;
+  const url=URL.createObjectURL(p.blob);activeObjectUrls.push(url);
+  return `<div class="photocard"><img src="${url}" alt="${label} photo"><div class="phototext"><b>${label}</b><br><span>${esc(p.name||'Saved photo')}</span><br><button class="danger" type="button" onclick="removeStorePhoto('${p.id}')">Remove photo</button></div></div>`;
+ }).join('');
+}
+window.removeStorePhoto=async photoId=>{await deletePhoto(photoId);await renderPhotos();document.getElementById('photoStatus').textContent='Photo removed.'};
+async function handlePhotoSelection(e){
+ const file=e.target.files&&e.target.files[0],storeId=editingPhotoStoreId;
+ if(!file||!storeId)return;
+ if(!file.type.startsWith('image/')){document.getElementById('photoStatus').textContent='Please select an image.';e.target.value='';return}
+ if(file.size>12*1024*1024){document.getElementById('photoStatus').textContent='Please choose a photo smaller than 12 MB.';e.target.value='';return}
+ const category=document.getElementById('photoCategory').value;
+ try{
+  document.getElementById('photoStatus').textContent='Saving photo…';
+  // Resize large phone photos to a manageable JPEG for reliable local storage and backup.
+  const blob=await resizePhoto(file,1600,0.84);
+  const existing=(await getStorePhotos(storeId)).filter(p=>p.category===category);
+  for(const p of existing)await deletePhoto(p.id);
+  await savePhoto({id:id(),storeId,category,name:file.name||category,blob,addedAt:new Date().toISOString()});
+  if(editingPhotoStoreId===storeId)await renderPhotos();
+  document.getElementById('photoStatus').textContent='Photo saved automatically. No Done button needed.';
+ }catch(err){console.error(err);document.getElementById('photoStatus').textContent='Could not save photo. Try another image or use Safari.'}
+ finally{e.target.value=''}
+}
+function resizePhoto(file,maxSide,quality){
+ return new Promise(resolve=>{
+  const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{
+   try{
+    const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight)),canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+    const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    canvas.toBlob(b=>{URL.revokeObjectURL(url);resolve(b||file)},'image/jpeg',quality);
+   }catch(e){URL.revokeObjectURL(url);resolve(file)}
+  };
+  img.onerror=()=>{URL.revokeObjectURL(url);resolve(file)};img.src=url;
+ });
+}
+document.getElementById('photoInput').addEventListener('change',handlePhotoSelection);
+document.getElementById('cameraInput').addEventListener('change',handlePhotoSelection);
+document.getElementById('photoModal').addEventListener('click',e=>{if(e.target.id==='photoModal')closePhotoEditor()});
+window.copyStoreAddress=async storeId=>{
+ const s=stores.find(x=>x.id===storeId);if(!s)return;
+ try{
+  if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(s.address)}
+  else{
+   const ta=document.createElement('textarea');ta.value=s.address;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+   const ok=document.execCommand('copy');ta.remove();if(!ok)throw Error('copy failed');
+  }
+  status('Address copied. Paste it into Messages or Apple Maps.');
+ }catch(e){
+  window.prompt('Copy this address:',s.address);
+ }
+};
+window.openAppleMaps=storeId=>{
+ const s=stores.find(x=>x.id===storeId);if(!s)return;
+ const url='https://maps.apple.com/?q='+encodeURIComponent(s.address)+'&ll='+encodeURIComponent(s.lat+','+s.lon);
+ window.open(url,'_blank','noopener');
+};
+
 (async()=>{
  loadStores();render();
  try{
