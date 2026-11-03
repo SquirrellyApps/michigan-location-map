@@ -34,7 +34,7 @@ label{font-size:12px;color:#526474;font-weight:650;display:block;margin:0 0 5px}
 .modalbody{padding:16px;display:grid;gap:12px}.formrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}.modalfoot{padding:13px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .photoarea{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
 .photocard{border:1px solid var(--line);border-radius:9px;overflow:hidden;min-width:0}.photocard img{width:100%;height:125px;object-fit:cover;display:block;background:#eef2f4}.photocard .phototext{padding:8px;font-size:12px}.photocard .phototext button{margin-top:6px;padding:5px 7px;font-size:11px}
-#photoInput{display:none}.small{font-size:11px;color:var(--muted)}footer{font-size:11px;color:#687987;padding:13px 2px}
+#photoInput,#cameraInput{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.photo-actions{display:flex;gap:8px;flex-wrap:wrap}.small{font-size:11px;color:var(--muted)}footer{font-size:11px;color:#687987;padding:13px 2px}
 
 body{background:#fff}header{padding:9px 13px}header h1{font-size:18px}header p{display:none}
 main{max-width:none;margin:0;padding:0}
@@ -49,20 +49,21 @@ main{max-width:none;margin:0;padding:0}
 #settingsPage .panel{margin-bottom:12px}
 @media(max-width:900px){.workspace{grid-template-columns:1fr}#map{height:58vh;min-height:350px}#directory{max-height:400px}.entry{grid-template-columns:1fr}.formrow{grid-template-columns:1fr}.photoarea{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media print{
- @page{size:landscape;margin:7mm}
- body,main{background:white;margin:0;padding:0}
+ @page{size:landscape;margin:6mm}
+ html,body{width:100%;height:auto;background:#fff!important;margin:0!important;padding:0!important;overflow:visible!important}
+ body{display:grid!important;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);gap:6mm;align-items:start}
  header,.entry,.note,.status,footer,.mapfoot,.tools,.locbuttons,.modalback,#settingsHead{display:none!important}
- main{display:grid;grid-template-columns:1.15fr 1fr;gap:7px;align-items:start}
- #mapPanel{display:block!important;border:1px solid #aaa;border-radius:0;box-shadow:none}
- #map{height:174mm!important;min-height:0!important}
- #settingsBack{position:static!important;display:block!important;background:white!important;z-index:auto!important;overflow:visible!important}
+ main{display:contents!important}
+ #mapPanel{display:block!important;grid-column:1;min-width:0;border:1px solid #aaa;border-radius:0;box-shadow:none;overflow:hidden}
+ #map{height:184mm!important;min-height:0!important;width:100%!important}
+ #settingsBack{grid-column:2;position:static!important;display:block!important;background:white!important;z-index:auto!important;overflow:visible!important;min-width:0}
  #settingsPage{width:auto!important;height:auto!important;max-height:none!important;overflow:visible!important;padding:0!important;background:white!important}
- #settingsPage .panelhead{padding:5px;border-bottom:1px solid #aaa}
- #settingsPage .panelhead strong{font-size:12px}
+ #settingsPage .panelhead{padding:4px;border-bottom:1px solid #aaa}
+ #settingsPage .panelhead strong{font-size:11px}
  #settingsPage .panel{border:1px solid #aaa;border-radius:0;box-shadow:none;overflow:visible}
- #settingsPage #directory{max-height:none;min-height:0;overflow:visible;padding:3px 7px}
- .loc{padding:4px 0;grid-template-columns:21px 1fr auto;gap:5px;break-inside:avoid}
- .num{width:18px;height:18px;font-size:8px}.locname{font-size:9px}.address{font-size:7px}
+ #settingsPage #directory{max-height:none!important;min-height:0!important;overflow:visible!important;padding:2px 5px}
+ .loc{padding:3px 0;grid-template-columns:18px minmax(0,1fr);gap:4px;break-inside:avoid}
+ .num{width:16px;height:16px;font-size:8px}.locname{font-size:8px}.address{font-size:7px;line-height:1.15;overflow-wrap:anywhere}
  #settingsPage .panel:has(#addForm){display:none!important}
 }
 </style>
@@ -96,7 +97,7 @@ main{max-width:none;margin:0;padding:0}
     <div><label>Location photos</label><div class="small">Add one photo for each category. Use the iPhone camera option or choose a photo from your library. Photos are stored locally in this browser.</div></div>
     <div class="photoarea" id="photoArea"></div>
     <div><label for="photoCategory">Photo category</label><select id="photoCategory"><option value="building">Building</option><option value="setup">Setup location</option><option value="storage">Storage location</option></select></div>
-    <div><label class="file-label" for="photoInput">Take / choose photo</label><input id="photoInput" type="file" accept="image/*" capture="environment"></div>
+    <div><label>Choose photo category first, then add a photo</label><div class="photo-actions"><button type="button" onclick="choosePhotoLibrary()">Choose from Photos</button><button type="button" onclick="takePhoto()">Take Photo</button></div><input id="photoInput" type="file" accept="image/*"><input id="cameraInput" type="file" accept="image/*" capture="environment"><div id="photoStatus" class="status" aria-live="polite">Photos save as soon as you select or take them.</div></div>
    </div>
    <div class="modalfoot"><button type="button" class="danger" onclick="deleteCurrent()">Delete location</button><button type="button" class="secondary" onclick="closeEditor()">Cancel</button><button type="submit">Save changes</button></div>
   </form>
@@ -113,7 +114,7 @@ window.addEventListener('resize',()=>map.invalidateSize());window.addEventListen
 const countyLayer=L.layerGroup().addTo(map), markerLayer=L.layerGroup().addTo(map);
 let stores=[], db, editingId=null, countyReady=false;
 const statusEl=document.getElementById('status');
-const status=m=>statusEl.textContent=m;
+const status=m=>{statusEl.textContent=m;const ps=document.getElementById('photoStatus');if(ps&&m)ps.textContent=m;};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const id=()=>crypto.randomUUID?crypto.randomUUID():'id-'+Date.now()+'-'+Math.random().toString(16).slice(2);
 function openDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,DB_VERSION);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains('photos'))d.createObjectStore('photos',{keyPath:'id'});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
@@ -143,12 +144,16 @@ document.getElementById('addForm').addEventListener('submit',async e=>{
  catch(err){status(err.message||'Could not find the address.');}finally{btn.disabled=false;}
 });
 window.openEditor=async storeId=>{const s=stores.find(x=>x.id===storeId);if(!s)return;editingId=storeId;document.getElementById('editName').value=s.name;document.getElementById('editAddress').value=s.address;document.getElementById('editTitle').textContent='Edit: '+s.name;document.getElementById('editBack').style.display='flex';await renderPhotos();};
-window.closeEditor=()=>{document.getElementById('editBack').style.display='none';editingId=null;document.getElementById('photoInput').value='';};
+window.closeEditor=()=>{document.getElementById('editBack').style.display='none';editingId=null;document.getElementById('photoInput').value='';document.getElementById('cameraInput').value='';};
+window.choosePhotoLibrary=()=>document.getElementById('photoInput').click();
+window.takePhoto=()=>document.getElementById('cameraInput').click();
 document.getElementById('editForm').addEventListener('submit',e=>{e.preventDefault();const s=stores.find(x=>x.id===editingId);if(!s)return;s.name=document.getElementById('editName').value.trim();s.address=document.getElementById('editAddress').value.trim();persist();render();closeEditor();status('Location updated.');});
 window.deleteCurrent=async()=>{const s=stores.find(x=>x.id===editingId);if(!s||!confirm('Delete '+s.name+' and its photos from this browser?'))return;for(const p of await getPhotos(s.id))await deletePhoto(p.id);stores=stores.filter(x=>x.id!==s.id);persist();render();closeEditor();status('Location deleted.');};
 async function renderPhotos(){const area=document.getElementById('photoArea');const photos=await getPhotos(editingId);const cats=[['building','Building'],['setup','Setup location'],['storage','Storage location']];area.innerHTML=cats.map(([key,label])=>{const p=photos.find(x=>x.category===key);return `<div class="photocard">${p?`<img src="${URL.createObjectURL(p.blob)}" alt="${label} photo">`:'<div style="height:125px;display:grid;place-items:center;color:#7a8b98;background:#f0f3f5;font-size:12px">No photo yet</div>'}<div class="phototext"><b>${label}</b><br><span class="small">${p?esc(p.name):'Not added'}</span>${p?`<br><button class="danger" onclick="removePhoto('${p.id}')">Remove photo</button>`:''}</div></div>`;}).join('');}
 window.removePhoto=async photoId=>{await deletePhoto(photoId);await renderPhotos();status('Photo removed.');};
-document.getElementById('photoInput').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file||!editingId)return;if(!file.type.startsWith('image/')){status('Choose an image file.');return;}if(file.size>10*1024*1024){status('Photo must be 10 MB or smaller.');return;}try{const category=document.getElementById('photoCategory').value;for(const p of await getPhotos(editingId))if(p.category===category)await deletePhoto(p.id);await savePhoto({id:id(),storeId:editingId,category,name:file.name,blob:file,addedAt:new Date().toISOString()});await renderPhotos();status('Photo saved locally.');}catch(err){status('Could not save photo. Browser storage may be full.');}finally{e.target.value='';}});
+async function handlePhotoSelection(e){const file=e.target.files?.[0];if(!file||!editingId)return;const storeId=editingId;if(!file.type.startsWith('image/')){status('Choose an image file.');e.target.value='';return;}if(file.size>10*1024*1024){status('Photo must be 10 MB or smaller.');e.target.value='';return;}try{status('Saving photo…');const category=document.getElementById('photoCategory').value;const existing=await getPhotos(storeId);for(const p of existing)if(p.category===category)await deletePhoto(p.id);await savePhoto({id:id(),storeId,category,name:file.name||('Photo '+new Date().toLocaleDateString()),blob:file,addedAt:new Date().toISOString()});if(editingId===storeId)await renderPhotos();status('Photo saved locally. It is ready now; you do not need to press Done.');}catch(err){console.error(err);status('Photo could not be saved. Try a smaller image or check browser storage.');}finally{e.target.value='';}}
+document.getElementById('photoInput').addEventListener('change',handlePhotoSelection);
+document.getElementById('cameraInput').addEventListener('change',handlePhotoSelection);
 window.exportBackup=async()=>{try{const photos=await new Promise((resolve,reject)=>{const tx=db.transaction('photos','readonly'),r=tx.objectStore('photos').getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});const encoded=[];for(const p of photos){const data=await blobToDataURL(p.blob);encoded.push({id:p.id,storeId:p.storeId,category:p.category,name:p.name,addedAt:p.addedAt,data});}const payload={format:'michigan-store-location-manager-backup-v1',exportedAt:new Date().toISOString(),stores,photos:encoded};downloadFile(JSON.stringify(payload),`michigan-location-backup-${new Date().toISOString().slice(0,10)}.json`,'application/json');status('Backup exported. Keep it somewhere safe.');}catch(e){status('Backup failed. Try again or export fewer photos.');}};
 function blobToDataURL(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob);});}
 function dataURLtoBlob(data){const [head,body]=data.split(',');const mime=(head.match(/data:(.*?);base64/)||[])[1]||'image/jpeg';const bin=atob(body),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return new Blob([bytes],{type:mime});}
