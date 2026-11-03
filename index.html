@@ -35,10 +35,19 @@ label{font-size:12px;color:#526474;font-weight:650;display:block;margin:0 0 5px}
 .photoarea{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
 .photocard{border:1px solid var(--line);border-radius:9px;overflow:hidden;min-width:0}.photocard img{width:100%;height:125px;object-fit:cover;display:block;background:#eef2f4}.photocard .phototext{padding:8px;font-size:12px}.photocard .phototext button{margin-top:6px;padding:5px 7px;font-size:11px}
 #photoInput{display:none}.small{font-size:11px;color:var(--muted)}footer{font-size:11px;color:#687987;padding:13px 2px}
+body{background:#fff}header{padding:10px 14px}header h1{font-size:18px}header p{display:none}
+main{max-width:none;margin:0;padding:0}#mapPanel{border:0;border-radius:0;box-shadow:none}
+#mapPanel .panelhead,#mapPanel .mapfoot{display:none}#map{height:calc(100dvh - 58px);min-height:360px}
+#settingsBack{position:fixed;inset:0;background:#10283d99;z-index:2500;display:none;align-items:stretch;justify-content:flex-end}
+#settingsPage{background:var(--bg);width:min(760px,100%);height:100%;overflow:auto;padding:12px}
+#settingsPage .workspace{display:block;margin-top:12px}#settingsPage .workspace>.panel:first-child{display:none}
+#settingsPage #directory{max-height:none;min-height:120px}#settingsPage .entry{grid-template-columns:1fr}
+#settingsPage .panel{margin-bottom:12px}
+@media(max-width:900px){#map{height:calc(100dvh - 54px);min-height:320px}}
 @media(max-width:900px){.workspace{grid-template-columns:1fr}#map{height:58vh;min-height:350px}#directory{max-height:400px}.entry{grid-template-columns:1fr}.formrow{grid-template-columns:1fr}.photoarea{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media print{
  @page{size:landscape;margin:7mm}
- body,main{background:white;margin:0;padding:0}header,.entry,.note,.status,footer,.mapfoot,.tools,.locbuttons,.modalback{display:none!important}
+ body,main{background:white;margin:0;padding:0}header,.entry,.note,.status,footer,.mapfoot,.tools,.locbuttons,.modalback,#settingsBack{display:none!important}#mapPanel{display:block!important}#map{height:174mm!important;min-height:0!important}
  .workspace{display:grid;grid-template-columns:1.15fr 1fr;gap:7px;margin:0}
  .panel{border:1px solid #aaa;border-radius:0;box-shadow:none}
  .panelhead{padding:5px}.panelhead strong{font-size:12px}
@@ -50,30 +59,12 @@ label{font-size:12px;color:#526474;font-weight:650;display:block;margin:0 0 5px}
 </style>
 </head>
 <body>
-<header><div><h1>Michigan Store Location Manager</h1><p>Lower Peninsula • County boundaries • Store directory and photos</p></div><button class="secondary" onclick="printPDF()">Print / Save one-page PDF</button></header>
-<main>
-<section class="panel">
-<form id="addForm" class="entry">
-<input id="storeName" placeholder="Store / event location name" required maxlength="120">
-<input id="storeAddress" placeholder="Full street address, city, MI ZIP" required maxlength="300">
-<button id="addBtn" type="submit">＋ Add location</button>
-</form>
-<div class="note">Single-user edition: locations and photos are saved in this browser on this device. Use Export backup regularly if you need a portable copy. The PDF includes the map and directory only, not photos.</div>
-<div id="status" class="status" aria-live="polite">Loading county boundaries…</div>
-</section>
-<div class="workspace">
-<section class="panel">
-<div class="panelhead"><strong>Michigan Lower Peninsula</strong><span class="small">Flat map • County lines only</span></div>
-<div id="map" aria-label="Michigan Lower Peninsula county map"></div>
-<div class="mapfoot">Numbered pins match the directory. The map uses plain county fills rather than street-map tiles.</div>
-</section>
-<section class="panel">
-<div class="panelhead"><strong>Location Directory (<span id="count">0</span>)</strong><div class="tools"><button class="secondary" onclick="exportBackup()">Export backup</button><button class="secondary" onclick="document.getElementById('importInput').click()">Import backup</button><input id="importInput" type="file" accept="application/json,.json" style="display:none"></div></div>
-<div id="directory"><div class="empty">No locations yet. Add a named address above.</div></div>
-</section>
-</div>
-<footer>County data is loaded from a public GeoJSON dataset. Address search uses OpenStreetMap Nominatim. Store data and photos stay in this browser unless you export a backup.</footer>
-</main>
+<header><div><h1>Michigan Location Map</h1></div><button class="secondary" onclick="openSettings()">⚙ Settings</button></header>
+<main><section class="panel" id="mapPanel"><div id="map" aria-label="Michigan Lower Peninsula county map"></div></section></main>
+<div id="settingsBack" role="dialog" aria-modal="true" aria-label="Map settings"><section id="settingsPage">
+<div class="panelhead" style="background:white;border:1px solid var(--line);border-radius:10px;margin-bottom:12px"><strong>Settings &amp; Location Directory</strong><div class="tools"><button class="secondary" onclick="printPDF()">Print / Save PDF</button><button onclick="closeSettings()">Done</button></div></div>
+<section class="panel"><form id="addForm" class="entry"><input id="storeName" placeholder="Store / event location name" required maxlength="120"><input id="storeAddress" placeholder="Full street address, city, MI ZIP" required maxlength="300"><button id="addBtn" type="submit">＋ Add location</button></form><div class="note">Locations and photos are saved in this browser on this device. Export backups regularly. The PDF includes the map and directory only, not photos.</div><div id="status" class="status" aria-live="polite">Loading county boundaries…</div></section>
+<section class="panel"><div class="panelhead"><strong>Location Directory (<span id="count">0</span>)</strong><div class="tools"><button class="secondary" onclick="exportBackup()">Export backup</button><button class="secondary" onclick="document.getElementById('importInput').click()">Import backup</button><input id="importInput" type="file" accept="application/json,.json" style="display:none"></div></div><div id="directory"><div class="empty">No locations yet. Add a named address above.</div></div></section><footer>County boundaries are loaded from a public GeoJSON dataset. Address search uses OpenStreetMap Nominatim. Store data and photos stay in this browser unless you export a backup.</footer></section></div>
 
 <div class="modalback" id="editBack" role="dialog" aria-modal="true" aria-labelledby="editTitle">
  <div class="modal">
@@ -92,6 +83,9 @@ label{font-size:12px;color:#526474;font-weight:650;display:block;margin:0 0 5px}
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+function openSettings(){document.getElementById('settingsBack').style.display='flex';setTimeout(()=>{if(map)map.invalidateSize()},80);}
+function closeSettings(){document.getElementById('settingsBack').style.display='none';setTimeout(()=>{if(map)map.invalidateSize()},80);}
+document.getElementById('settingsBack').addEventListener('click',e=>{if(e.target.id==='settingsBack')closeSettings();});
 const DB_NAME='miStoreLocationManager', DB_VERSION=1, STORE_KEY='miStoreLocationsV2';
 const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([43.55,-84.8],6);
 const countyLayer=L.layerGroup().addTo(map), markerLayer=L.layerGroup().addTo(map);
