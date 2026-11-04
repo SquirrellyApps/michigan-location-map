@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta name="aws-zone-colors-version" content="mackinac-and-island-fix-v1">
+<meta name="aws-zone-colors-version" content="leelanau-county-fix-v1">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0645d8">
@@ -322,8 +322,13 @@ const zoneColors={
  roscommon:'#42ad82',ludington:'#35b5c8',lowell:'#0873ad',
  portage:'#8060a6',lansing:'#c29acb'
 };
+function countyName(feature){
+ const p=feature?.properties||{};
+ const raw=p.NAME||p.name||p.COUNTY_NAME||p.COUNTY||p.County||'';
+ return String(raw).replace(/\\s+County$/i,'').trim();
+}
 function countyZone(feature){
- const name=feature.properties?.NAME||feature.properties?.name||'';
+ const name=countyName(feature);
  for(const [zone,names] of Object.entries(zoneGroups))if(names.has(name))return zone;
  return null;
 }
@@ -342,8 +347,8 @@ function countyZone(feature){
   // Include Mackinac County (green Petoskey zone), while leaving the rest
   // of the Upper Peninsula counties unfilled.
   const features=(geo.features||[]).filter(f=>{
-   const name=f.properties?.NAME||f.properties?.name||'';
-   return name && (!upperPeninsulaNames.has(name) || name==='Mackinac');
+   const name=countyName(f);
+   return name && (!upperPeninsulaNames.has(name) || name==='Mackinac' || name==='Leelanau');
   });
   if(!features.length)throw Error('No Lower Peninsula counties found');
   const collection={type:'FeatureCollection',features};
@@ -363,9 +368,10 @@ function countyZone(feature){
    return Math.abs(area/2);
   }
   const overlayFeatures=features.map(feature=>{
-   const name=feature.properties?.NAME||feature.properties?.name||'';
+   const name=countyName(feature);
    const geometry=feature.geometry;
-   if(!geometry || geometry.type!=='MultiPolygon' || name==='Mackinac')return feature;
+   // Leelanau is a narrow peninsula county; preserve its full geometry.
+   if(!geometry || geometry.type!=='MultiPolygon' || name==='Mackinac' || name==='Leelanau')return feature;
    const polygons=geometry.coordinates;
    if(polygons.length<2)return feature;
    const ranked=polygons.map((polygon,index)=>({
