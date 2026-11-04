@@ -40,8 +40,8 @@ footer{font-size:11px;color:#687987;padding:12px}
 .zone-key{display:flex;align-items:center;gap:8px;font-size:12px;min-width:0}
 .zone-swatch{width:20px;height:16px;flex:none;border:1px solid #6b8795;border-radius:2px}
 .zone-swatch.petoskey{background:#218c50}
-.zone-swatch.petoskey-roofing{background-color:#218c50;background-image:radial-gradient(#b7e5c5 1.5px,transparent 1.7px);background-size:7px 7px}
-.zone-swatch.grawn-roofing{background-color:#b7e5b5;background-image:radial-gradient(#4ba76b 1.5px,transparent 1.7px);background-size:7px 7px}
+.zone-swatch.petoskey-roofing{background-color:#218c50;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#b7e5c5 4px 6px)}
+.zone-swatch.grawn-roofing{background-color:#b7e5b5;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#4ba76b 4px 6px)}
 .zone-swatch.roscommon{background:#42ad82}
 .zone-swatch.ludington{background:#35b5c8}
 .zone-swatch.lowell{background:#0873ad}
@@ -345,29 +345,41 @@ function countyZone(feature){
    },
    interactive:false
   }).addTo(zoneLayer);
-  // Apply dotted fills to the roofing categories to match the supplied key.
+  // Apply diagonal stripe fills to the roofing categories to match the key.
   const roofingSvg=()=>{
    let svg=null;
    zoneLayer.eachLayer(group=>{if(!svg&&group.eachLayer)group.eachLayer(layer=>{if(!svg&&layer.getElement)svg=layer.getElement()?.ownerSVGElement;});});
    if(!svg)return;
    let defs=svg.querySelector('defs');
    if(!defs){defs=document.createElementNS('http://www.w3.org/2000/svg','defs');svg.insertBefore(defs,svg.firstChild);}
-   const makePattern=(id,bg,dot)=>{
+   const makeStripe=(id,bg,stripe)=>{
     if(svg.querySelector('#'+id))return;
-    const pattern=document.createElementNS('http://www.w3.org/2000/svg','pattern');pattern.setAttribute('id',id);pattern.setAttribute('patternUnits','userSpaceOnUse');pattern.setAttribute('width','8');pattern.setAttribute('height','8');
-    const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');rect.setAttribute('width','8');rect.setAttribute('height','8');rect.setAttribute('fill',bg);
-    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('cx','4');circle.setAttribute('cy','4');circle.setAttribute('r','1.4');circle.setAttribute('fill',dot);
-    pattern.append(rect,circle);defs.appendChild(pattern);
+    const ns='http://www.w3.org/2000/svg';
+    const pattern=document.createElementNS(ns,'pattern');
+    pattern.setAttribute('id',id);pattern.setAttribute('patternUnits','userSpaceOnUse');
+    pattern.setAttribute('width','8');pattern.setAttribute('height','8');
+    pattern.setAttribute('patternTransform','rotate(45)');
+    const rect=document.createElementNS(ns,'rect');
+    rect.setAttribute('width','8');rect.setAttribute('height','8');rect.setAttribute('fill',bg);
+    const band=document.createElementNS(ns,'rect');
+    band.setAttribute('width','2.5');band.setAttribute('height','8');band.setAttribute('fill',stripe);
+    pattern.append(rect,band);defs.appendChild(pattern);
    };
-   makePattern('petoskey-roofing-pattern','#218c50','#b7e5c5');
-   makePattern('grawn-roofing-pattern','#b7e5b5','#4ba76b');
-   zoneLayer.eachLayer(group=>{if(group.eachLayer)group.eachLayer(layer=>{
-    const zone=countyZone(layer.feature),path=layer.getElement?.();
-    if(path&&zone==='petoskeyRoofing')path.setAttribute('fill','url(#petoskey-roofing-pattern)');
-    if(path&&zone==='grawnRoofing')path.setAttribute('fill','url(#grawn-roofing-pattern)');
-   });});
+   makeStripe('petoskey-roofing-stripes','#218c50','#b7e5c5');
+   makeStripe('grawn-roofing-stripes','#b7e5b5','#4ba76b');
+   zoneLayer.eachLayer(group=>{
+    if(!group.eachLayer)return;
+    group.eachLayer(layer=>{
+     const zone=countyZone(layer.feature),el=layer.getElement?.();
+     if(!el)return;
+     if(zone==='petoskeyRoofing')el.setAttribute('fill','url(#petoskey-roofing-stripes)');
+     if(zone==='grawnRoofing')el.setAttribute('fill','url(#grawn-roofing-stripes)');
+    });
+   });
   };
   if(showZoneOverlay)zoneLayer.addTo(map);
+  roofingSvg();
+  map.on('zoomend moveend',roofingSvg);
   roofingSvg();
   map.fitBounds(L.geoJSON(collection).getBounds(),{padding:[12,12]});
   status(stores.length?`Map ready. ${stores.length} saved location(s) loaded.`:'Map ready. Add your first location.');
