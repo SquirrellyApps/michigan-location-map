@@ -33,6 +33,21 @@ input{width:100%;padding:10px 11px;border:1px solid #cbd5df;border-radius:8px;fo
 .locname{font-size:14px;font-weight:750;overflow-wrap:anywhere}.address{font-size:12px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
 .locbuttons{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.locbuttons button{padding:6px 8px;font-size:11px}
 footer{font-size:11px;color:#687987;padding:12px}
+.zone-legend{display:none;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 10px;box-shadow:0 2px 8px #17364f0a}
+.zone-legend.visible{display:block}
+.zone-legend-title{font-size:13px;font-weight:800;margin-bottom:8px}
+.zone-legend-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 12px}
+.zone-key{display:flex;align-items:center;gap:8px;font-size:12px;min-width:0}
+.zone-swatch{width:20px;height:16px;flex:none;border:1px solid #6b8795;border-radius:2px}
+.zone-swatch.petoskey{background:#218c50}
+.zone-swatch.petoskey-roofing{background-color:#218c50;background-image:radial-gradient(#b7e5c5 1.5px,transparent 1.7px);background-size:7px 7px}
+.zone-swatch.grawn-roofing{background-color:#b7e5b5;background-image:radial-gradient(#4ba76b 1.5px,transparent 1.7px);background-size:7px 7px}
+.zone-swatch.roscommon{background:#42ad82}
+.zone-swatch.ludington{background:#35b5c8}
+.zone-swatch.lowell{background:#0873ad}
+.zone-swatch.portage{background:#8060a6}
+.zone-swatch.lansing{background:#c29acb}
+@media(max-width:600px){.zone-legend-grid{grid-template-columns:1fr 1fr}.zone-key{font-size:11px}}
 .photo-modal{position:fixed;inset:0;background:#102638aa;z-index:5000;display:none;align-items:center;justify-content:center;padding:12px}
 .photo-modal.open{display:flex}.photo-dialog{width:min(760px,100%);max-height:92vh;overflow:auto;background:white;border-radius:14px;box-shadow:0 12px 45px #0005}
 .photo-dialog-head{position:sticky;top:0;background:white;border-bottom:1px solid var(--line);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:1}
@@ -52,10 +67,28 @@ footer{font-size:11px;color:#687987;padding:12px}
 <body>
 <header>
  <div class="header-brand"><img class="header-logo" src="./seal-gentleman-512.png" alt="Seal gentleman app logo"><h1>AWS STORE LOCATOR</h1></div>
- <div class="header-actions"><label class="pin-toggle"><input id="showPinNames" type="checkbox" checked> Show pin names</label></div>
+ <div class="header-actions">
+  <label class="pin-toggle"><input id="showZoneOverlay" type="checkbox"> Show zone colors</label>
+  <label class="pin-toggle"><input id="showPinNames" type="checkbox" checked> Show pin names</label>
+ </div>
 </header>
 <main class="workspace">
- <section class="panel" id="mapPanel"><div id="map" aria-label="Michigan Lower Peninsula county map"></div></section>
+ <section>
+  <div class="zone-legend" id="zoneLegend" aria-label="Zone and product availability key">
+   <div class="zone-legend-title">Zone &amp; Product Availability</div>
+   <div class="zone-legend-grid">
+    <div class="zone-key"><span class="zone-swatch petoskey"></span><span>Petoskey</span></div>
+    <div class="zone-key"><span class="zone-swatch petoskey-roofing"></span><span>Petoskey (Roofing)</span></div>
+    <div class="zone-key"><span class="zone-swatch grawn-roofing"></span><span>Grawn (Roofing)</span></div>
+    <div class="zone-key"><span class="zone-swatch roscommon"></span><span>Roscommon</span></div>
+    <div class="zone-key"><span class="zone-swatch ludington"></span><span>Ludington</span></div>
+    <div class="zone-key"><span class="zone-swatch lowell"></span><span>Lowell</span></div>
+    <div class="zone-key"><span class="zone-swatch portage"></span><span>Portage</span></div>
+    <div class="zone-key"><span class="zone-swatch lansing"></span><span>Lansing</span></div>
+   </div>
+  </div>
+  <div class="panel" id="mapPanel"><div id="map" aria-label="Michigan Lower Peninsula county map"></div></div>
+ </section>
  <aside class="sidecolumn">
   <section class="panel">
    <form id="addForm" class="entry">
@@ -107,9 +140,20 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
  maxZoom:19,
  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 }).addTo(map);
-const countyLayer=L.layerGroup().addTo(map),markerLayer=L.layerGroup().addTo(map);
+const countyLayer=L.layerGroup().addTo(map),zoneLayer=L.layerGroup(),markerLayer=L.layerGroup().addTo(map);
 window.addEventListener('resize',()=>map.invalidateSize());
 let stores=[],showPinNames=localStorage.getItem('miShowPinNames')!=='false';
+let showZoneOverlay=localStorage.getItem('miShowZoneOverlay')==='true';
+const zoneToggle=document.getElementById('showZoneOverlay');
+const zoneLegend=document.getElementById('zoneLegend');
+zoneToggle.checked=showZoneOverlay;
+if(showZoneOverlay)zoneLegend.classList.add('visible');
+zoneToggle.addEventListener('change',()=>{
+ showZoneOverlay=zoneToggle.checked;
+ localStorage.setItem('miShowZoneOverlay',String(showZoneOverlay));
+ if(showZoneOverlay){zoneLayer.addTo(map);zoneLegend.classList.add('visible')}
+ else{map.removeLayer(zoneLayer);zoneLegend.classList.remove('visible')}
+});
 const statusEl=document.getElementById('status');
 const status=m=>statusEl.textContent=m;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -260,16 +304,76 @@ window.openAppleMaps=storeId=>{
  window.open(url,'_blank','noopener');
 };
 
+const zoneGroups={
+ petoskey:new Set(['Mackinac','Emmet','Cheboygan','Presque Isle','Otsego','Montmorency','Alpena']),
+ petoskeyRoofing:new Set(['Charlevoix','Antrim']),
+ grawnRoofing:new Set(['Benzie','Grand Traverse','Kalkaska','Manistee','Wexford','Missaukee']),
+ roscommon:new Set(['Crawford','Oscoda','Roscommon','Ogemaw']),
+ ludington:new Set(['Mason','Lake','Osceola','Clare','Oceana','Newaygo','Mecosta','Isabella']),
+ lowell:new Set(['Muskegon','Ottawa','Kent','Ionia','Allegan','Barry','Montcalm']),
+ portage:new Set(['Berrien','Cass','St. Joseph','Branch','Van Buren','Kalamazoo','Calhoun']),
+ lansing:new Set(['Gratiot','Clinton','Shiawassee','Eaton','Ingham','Jackson'])
+};
+const zoneColors={
+ petoskey:'#218c50',petoskeyRoofing:'#218c50',grawnRoofing:'#b7e5b5',
+ roscommon:'#42ad82',ludington:'#35b5c8',lowell:'#0873ad',
+ portage:'#8060a6',lansing:'#c29acb'
+};
+function countyZone(feature){
+ const name=feature.properties?.NAME||feature.properties?.name||'';
+ for(const [zone,names] of Object.entries(zoneGroups))if(names.has(name))return zone;
+ return null;
+}
 (async()=>{
  loadStores();render();
  try{
-  const res=await fetch('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json');if(!res.ok)throw Error('County data fetch failed');const geo=await res.json();
+  const res=await fetch('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json');
+  if(!res.ok)throw Error('County data fetch failed');
+  const geo=await res.json();
   const upperPeninsulaFips=new Set(['26003','26013','26033','26041','26043','26053','26061','26071','26083','26095','26103','26109','26131','26153','26097']);
-  const features=geo.features.filter(f=>{const fips=String(f.id||f.properties?.GEO_ID||'').replace(/\D/g,'').slice(-5);return fips.startsWith('26')&&!upperPeninsulaFips.has(fips)});
+  const features=geo.features.filter(f=>{
+   const fips=String(f.id||f.properties?.GEO_ID||'').replace(/\D/g,'').slice(-5);
+   return fips.startsWith('26')&&!upperPeninsulaFips.has(fips);
+  });
   if(!features.length)throw Error('No Michigan counties found');
-  L.geoJSON({type:'FeatureCollection',features},{style:{color:'#6b8795',weight:1.15,opacity:0.82,fillOpacity:0},interactive:false}).addTo(countyLayer);
-  map.fitBounds(L.geoJSON({type:'FeatureCollection',features}).getBounds(),{padding:[12,12]});status(stores.length?`Map ready. ${stores.length} saved location(s) loaded.`:'Map ready. Add your first location.');
- }catch(err){status('The app opened, but county boundaries did not load. Check the internet connection and reload.')}
+  const collection={type:'FeatureCollection',features};
+  L.geoJSON(collection,{style:{color:'#6b8795',weight:1.15,opacity:.82,fillOpacity:0},interactive:false}).addTo(countyLayer);
+  L.geoJSON(collection,{
+   style:feature=>{
+    const zone=countyZone(feature);
+    return {color:'#526b76',weight:.9,opacity:.9,fillColor:zone?zoneColors[zone]:'#dce4e7',fillOpacity:zone?.88:.18};
+   },
+   interactive:false
+  }).addTo(zoneLayer);
+  // Apply dotted fills to the roofing categories to match the supplied key.
+  const roofingSvg=()=>{
+   let svg=null;
+   zoneLayer.eachLayer(group=>{if(!svg&&group.eachLayer)group.eachLayer(layer=>{if(!svg&&layer.getElement)svg=layer.getElement()?.ownerSVGElement;});});
+   if(!svg)return;
+   let defs=svg.querySelector('defs');
+   if(!defs){defs=document.createElementNS('http://www.w3.org/2000/svg','defs');svg.insertBefore(defs,svg.firstChild);}
+   const makePattern=(id,bg,dot)=>{
+    if(svg.querySelector('#'+id))return;
+    const pattern=document.createElementNS('http://www.w3.org/2000/svg','pattern');pattern.setAttribute('id',id);pattern.setAttribute('patternUnits','userSpaceOnUse');pattern.setAttribute('width','8');pattern.setAttribute('height','8');
+    const rect=document.createElementNS('http://www.w3.org/2000/svg','rect');rect.setAttribute('width','8');rect.setAttribute('height','8');rect.setAttribute('fill',bg);
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('cx','4');circle.setAttribute('cy','4');circle.setAttribute('r','1.4');circle.setAttribute('fill',dot);
+    pattern.append(rect,circle);defs.appendChild(pattern);
+   };
+   makePattern('petoskey-roofing-pattern','#218c50','#b7e5c5');
+   makePattern('grawn-roofing-pattern','#b7e5b5','#4ba76b');
+   zoneLayer.eachLayer(group=>{if(group.eachLayer)group.eachLayer(layer=>{
+    const zone=countyZone(layer.feature),path=layer.getElement?.();
+    if(path&&zone==='petoskeyRoofing')path.setAttribute('fill','url(#petoskey-roofing-pattern)');
+    if(path&&zone==='grawnRoofing')path.setAttribute('fill','url(#grawn-roofing-pattern)');
+   });});
+  };
+  if(showZoneOverlay)zoneLayer.addTo(map);
+  roofingSvg();
+  map.fitBounds(L.geoJSON(collection).getBounds(),{padding:[12,12]});
+  status(stores.length?`Map ready. ${stores.length} saved location(s) loaded.`:'Map ready. Add your first location.');
+ }catch(err){
+  status('The app opened, but county boundaries did not load. Check the internet connection and reload.');
+ }
 })();
 </script>
 </body>
