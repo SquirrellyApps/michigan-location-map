@@ -40,8 +40,8 @@ footer{font-size:11px;color:#687987;padding:12px}
 .zone-key{display:flex;align-items:center;gap:8px;font-size:12px;min-width:0}
 .zone-swatch{width:20px;height:16px;flex:none;border:1px solid #6b8795;border-radius:2px}
 .zone-swatch.petoskey{background:#218c50}
-.zone-swatch.petoskey-roofing{background-color:#218c50;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#b7e5c5 4px 6px)}
-.zone-swatch.grawn-roofing{background-color:#b7e5b5;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#4ba76b 4px 6px)}
+.zone-swatch.petoskey-roofing{background-color:#e32636;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#ffd2d6 4px 6px)}
+.zone-swatch.grawn-roofing{background-color:#ff941f;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#fff0d8 4px 6px)}
 .zone-swatch.roscommon{background:#42ad82}
 .zone-swatch.ludington{background:#35b5c8}
 .zone-swatch.lowell{background:#0873ad}
@@ -133,7 +133,7 @@ const photoReady = new Promise((resolve,reject)=>{
   req.onerror=()=>reject(req.error||new Error('Photo storage unavailable'));
  }catch(e){reject(e)}
 });
-const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([43.55,-84.8],6);
+const map=L.map('map',{zoomControl:true,preferCanvas:false}).setView([43.55,-84.8],6);
 // Detailed street-map baselayer with neighborhood roads, labels, parks and water,
 // styled to approximate the clean, colorful Apple Maps look in the reference.
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
@@ -151,8 +151,10 @@ if(showZoneOverlay)zoneLegend.classList.add('visible');
 zoneToggle.addEventListener('change',()=>{
  showZoneOverlay=zoneToggle.checked;
  localStorage.setItem('miShowZoneOverlay',String(showZoneOverlay));
- if(showZoneOverlay){zoneLayer.addTo(map);zoneLegend.classList.add('visible')}
- else{map.removeLayer(zoneLayer);zoneLegend.classList.remove('visible')}
+ if(showZoneOverlay){
+  zoneLayer.addTo(map);zoneLegend.classList.add('visible');
+  requestAnimationFrame(()=>window.applyRoofingStripes?.());
+ }else{map.removeLayer(zoneLayer);zoneLegend.classList.remove('visible')}
 });
 const statusEl=document.getElementById('status');
 const status=m=>statusEl.textContent=m;
@@ -315,7 +317,7 @@ const zoneGroups={
  lansing:new Set(['Gratiot','Clinton','Shiawassee','Eaton','Ingham','Jackson'])
 };
 const zoneColors={
- petoskey:'#218c50',petoskeyRoofing:'#218c50',grawnRoofing:'#b7e5b5',
+ petoskey:'#218c50',petoskeyRoofing:'#e32636',grawnRoofing:'#ff941f',
  roscommon:'#42ad82',ludington:'#35b5c8',lowell:'#0873ad',
  portage:'#8060a6',lansing:'#c29acb'
 };
@@ -327,64 +329,99 @@ function countyZone(feature){
 (async()=>{
  loadStores();render();
  try{
-  const res=await fetch('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json');
-  if(!res.ok)throw Error('County data fetch failed');
+  // Use Michigan's own county boundary service instead of the generic US county file.
+  const countyUrl='https://services.arcgis.com/T2graiaSQnlmwwmp/ArcGIS/rest/services/Michigan_Counties_All/FeatureServer/0/query?where=1%3D1&outFields=NAME%2CFIPSCODE%2CPENINSULA&returnGeometry=true&outSR=4326&f=geojson';
+  const res=await fetch(countyUrl);
+  if(!res.ok)throw Error('Michigan county data fetch failed');
   const geo=await res.json();
-  const upperPeninsulaFips=new Set(['26003','26013','26033','26041','26043','26053','26061','26071','26083','26095','26103','26109','26131','26153','26097']);
-  const features=geo.features.filter(f=>{
-   const fips=String(f.id||f.properties?.GEO_ID||'').replace(/\D/g,'').slice(-5);
-   return fips.startsWith('26')&&!upperPeninsulaFips.has(fips);
+  const upperPeninsulaNames=new Set([
+   'Alger','Baraga','Chippewa','Delta','Dickinson','Gogebic','Houghton',
+   'Iron','Keweenaw','Luce','Marquette','Menominee','Ontonagon','Schoolcraft'
+  ]);
+  // Mackinac is shown in the reference key but belongs to the Upper Peninsula;
+  // keep the current map focused on the Lower Peninsula.
+  const features=(geo.features||[]).filter(f=>{
+   const name=f.properties?.NAME||f.properties?.name||'';
+   return name && !upperPeninsulaNames.has(name) && name!=='Mackinac';
   });
-  if(!features.length)throw Error('No Michigan counties found');
+  if(!features.length)throw Error('No Lower Peninsula counties found');
   const collection={type:'FeatureCollection',features};
-  L.geoJSON(collection,{style:{color:'#6b8795',weight:1.15,opacity:.82,fillOpacity:0},interactive:false}).addTo(countyLayer);
+
+  L.geoJSON(collection,{
+   style:{color:'#6b8795',weight:1.15,opacity:.82,fillOpacity:0},
+   interactive:false
+  }).addTo(countyLayer);
+
   L.geoJSON(collection,{
    style:feature=>{
     const zone=countyZone(feature);
-    return {color:'#526b76',weight:.9,opacity:.9,fillColor:zone?zoneColors[zone]:'#dce4e7',fillOpacity:zone?.88:.18};
+    return {
+     color:'#526b76',weight:1,opacity:.95,
+     fillColor:zone?zoneColors[zone]:'#dce4e7',
+     fillOpacity:zone?.88:.18
+    };
    },
    interactive:false
   }).addTo(zoneLayer);
-  // Apply diagonal stripe fills to the roofing categories to match the key.
+
+  // SVG patterns allow the two roofing regions to have real diagonal stripe fills.
   const roofingSvg=()=>{
    let svg=null;
-   zoneLayer.eachLayer(group=>{if(!svg&&group.eachLayer)group.eachLayer(layer=>{if(!svg&&layer.getElement)svg=layer.getElement()?.ownerSVGElement;});});
+   zoneLayer.eachLayer(group=>{
+    if(!svg&&group.eachLayer)group.eachLayer(layer=>{
+     if(!svg&&layer.getElement)svg=layer.getElement()?.ownerSVGElement;
+    });
+   });
    if(!svg)return;
    let defs=svg.querySelector('defs');
-   if(!defs){defs=document.createElementNS('http://www.w3.org/2000/svg','defs');svg.insertBefore(defs,svg.firstChild);}
+   if(!defs){
+    defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+    svg.insertBefore(defs,svg.firstChild);
+   }
    const makeStripe=(id,bg,stripe)=>{
     if(svg.querySelector('#'+id))return;
     const ns='http://www.w3.org/2000/svg';
     const pattern=document.createElementNS(ns,'pattern');
-    pattern.setAttribute('id',id);pattern.setAttribute('patternUnits','userSpaceOnUse');
-    pattern.setAttribute('width','8');pattern.setAttribute('height','8');
+    pattern.setAttribute('id',id);
+    pattern.setAttribute('patternUnits','userSpaceOnUse');
+    pattern.setAttribute('width','9');
+    pattern.setAttribute('height','9');
     pattern.setAttribute('patternTransform','rotate(45)');
     const rect=document.createElementNS(ns,'rect');
-    rect.setAttribute('width','8');rect.setAttribute('height','8');rect.setAttribute('fill',bg);
+    rect.setAttribute('width','9');rect.setAttribute('height','9');
+    rect.setAttribute('fill',bg);
     const band=document.createElementNS(ns,'rect');
-    band.setAttribute('width','2.5');band.setAttribute('height','8');band.setAttribute('fill',stripe);
+    band.setAttribute('width','3');band.setAttribute('height','9');
+    band.setAttribute('fill',stripe);
     pattern.append(rect,band);defs.appendChild(pattern);
    };
-   makeStripe('petoskey-roofing-stripes','#218c50','#b7e5c5');
-   makeStripe('grawn-roofing-stripes','#b7e5b5','#4ba76b');
+   makeStripe('petoskey-roofing-stripes','#e32636','#ffd2d6');
+   makeStripe('grawn-roofing-stripes','#ff941f','#fff0d8');
    zoneLayer.eachLayer(group=>{
     if(!group.eachLayer)return;
     group.eachLayer(layer=>{
      const zone=countyZone(layer.feature),el=layer.getElement?.();
      if(!el)return;
-     if(zone==='petoskeyRoofing')el.setAttribute('fill','url(#petoskey-roofing-stripes)');
-     if(zone==='grawnRoofing')el.setAttribute('fill','url(#grawn-roofing-stripes)');
+     if(zone==='petoskeyRoofing')el.style.fill='url(#petoskey-roofing-stripes)';
+     if(zone==='grawnRoofing')el.style.fill='url(#grawn-roofing-stripes)';
     });
    });
   };
+
+  window.applyRoofingStripes=roofingSvg;
   if(showZoneOverlay)zoneLayer.addTo(map);
-  roofingSvg();
+  // Fit only the actual Lower Peninsula counties, after the mobile map has laid out.
+  const bounds=L.geoJSON(collection).getBounds();
+  requestAnimationFrame(()=>{
+   map.invalidateSize(true);
+   map.fitBounds(bounds,{padding:[12,12],animate:false});
+   roofingSvg();
+  });
   map.on('zoomend moveend',roofingSvg);
-  roofingSvg();
-  map.fitBounds(L.geoJSON(collection).getBounds(),{padding:[12,12]});
   status(stores.length?`Map ready. ${stores.length} saved location(s) loaded.`:'Map ready. Add your first location.');
  }catch(err){
-  status('The app opened, but county boundaries did not load. Check the internet connection and reload.');
+  console.error(err);
+  status('The app opened, but Michigan county boundaries did not load. Check the internet connection and reload.');
  }
 })();
 </script>
