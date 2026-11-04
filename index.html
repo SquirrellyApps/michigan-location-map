@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<meta name="aws-zone-colors-version" content="mackinac-and-island-fix-v1">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0645d8">
@@ -40,8 +41,8 @@ footer{font-size:11px;color:#687987;padding:12px}
 .zone-key{display:flex;align-items:center;gap:8px;font-size:12px;min-width:0}
 .zone-swatch{width:20px;height:16px;flex:none;border:1px solid #6b8795;border-radius:2px}
 .zone-swatch.petoskey{background:#218c50}
-.zone-swatch.petoskey-roofing{background-color:#e32636;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#ffd2d6 4px 6px)}
-.zone-swatch.grawn-roofing{background-color:#ff941f;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#fff0d8 4px 6px)}
+.zone-swatch.petoskey-roofing{background-color:#218c50;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#b7e5c5 4px 6px)}
+.zone-swatch.grawn-roofing{background-color:#b7e5b5;background-image:repeating-linear-gradient(135deg,transparent 0 4px,#4ba76b 4px 6px)}
 .zone-swatch.roscommon{background:#42ad82}
 .zone-swatch.ludington{background:#35b5c8}
 .zone-swatch.lowell{background:#0873ad}
@@ -317,7 +318,7 @@ const zoneGroups={
  lansing:new Set(['Gratiot','Clinton','Shiawassee','Eaton','Ingham','Jackson'])
 };
 const zoneColors={
- petoskey:'#218c50',petoskeyRoofing:'#e32636',grawnRoofing:'#ff941f',
+ petoskey:'#218c50',petoskeyRoofing:'#218c50',grawnRoofing:'#b7e5b5',
  roscommon:'#42ad82',ludington:'#35b5c8',lowell:'#0873ad',
  portage:'#8060a6',lansing:'#c29acb'
 };
@@ -338,11 +339,11 @@ function countyZone(feature){
    'Alger','Baraga','Chippewa','Delta','Dickinson','Gogebic','Houghton',
    'Iron','Keweenaw','Luce','Marquette','Menominee','Ontonagon','Schoolcraft'
   ]);
-  // Mackinac is shown in the reference key but belongs to the Upper Peninsula;
-  // keep the current map focused on the Lower Peninsula.
+  // Include Mackinac County (green Petoskey zone), while leaving the rest
+  // of the Upper Peninsula counties unfilled.
   const features=(geo.features||[]).filter(f=>{
    const name=f.properties?.NAME||f.properties?.name||'';
-   return name && !upperPeninsulaNames.has(name) && name!=='Mackinac';
+   return name && (!upperPeninsulaNames.has(name) || name==='Mackinac');
   });
   if(!features.length)throw Error('No Lower Peninsula counties found');
   const collection={type:'FeatureCollection',features};
@@ -352,7 +353,29 @@ function countyZone(feature){
    interactive:false
   }).addTo(countyLayer);
 
-  L.geoJSON(collection,{
+  // Remove detached tiny polygon fragments from colored county fills so
+  // stray offshore islands do not get a zone color. Keep all Mackinac pieces.
+  function polygonAreaEstimate(ring){
+   let area=0;
+   for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    area += ring[j][0]*ring[i][1] - ring[i][0]*ring[j][1];
+   }
+   return Math.abs(area/2);
+  }
+  const overlayFeatures=features.map(feature=>{
+   const name=feature.properties?.NAME||feature.properties?.name||'';
+   const geometry=feature.geometry;
+   if(!geometry || geometry.type!=='MultiPolygon' || name==='Mackinac')return feature;
+   const polygons=geometry.coordinates;
+   if(polygons.length<2)return feature;
+   const ranked=polygons.map((polygon,index)=>({
+    polygon,index,area:polygonAreaEstimate(polygon[0]||[])
+   })).sort((a,b)=>b.area-a.area);
+   // Keep the main county landmass only for counties that include detached islands.
+   return {...feature,geometry:{...geometry, type:'MultiPolygon',coordinates:[ranked[0].polygon]}};
+  });
+  const overlayCollection={type:'FeatureCollection',features:overlayFeatures};
+  L.geoJSON(overlayCollection,{
    style:feature=>{
     const zone=countyZone(feature);
     return {
@@ -395,8 +418,8 @@ function countyZone(feature){
     band.setAttribute('fill',stripe);
     pattern.append(rect,band);defs.appendChild(pattern);
    };
-   makeStripe('petoskey-roofing-stripes','#e32636','#ffd2d6');
-   makeStripe('grawn-roofing-stripes','#ff941f','#fff0d8');
+   makeStripe('petoskey-roofing-stripes','#218c50','#b7e5c5');
+   makeStripe('grawn-roofing-stripes','#b7e5b5','#4ba76b');
    zoneLayer.eachLayer(group=>{
     if(!group.eachLayer)return;
     group.eachLayer(layer=>{
