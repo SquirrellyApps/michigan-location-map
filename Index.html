@@ -1,14 +1,15 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta name="aws-zone-colors-version" content="original-greens-v2">
+<meta name="aws-zone-colors-version" content="leelanau-roofing-overlay-v2">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0645d8">
+<meta name="apple-mobile-web-app-title" content="RetailOS">
 <link rel="icon" type="image/png" sizes="512x512" href="./seal-gentleman-512.png">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>AWS STORE LOCATOR</title>
+<title>RetailOS</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{--navy:#17364f;--blue:#2477b7;--line:#d6dee6;--muted:#617282;--bg:#f4f7fa;--red:#a52b32}
@@ -310,7 +311,7 @@ window.openAppleMaps=storeId=>{
 const zoneGroups={
  petoskey:new Set(['Mackinac','Emmet','Cheboygan','Presque Isle','Otsego','Montmorency','Alpena']),
  petoskeyRoofing:new Set(['Charlevoix','Antrim']),
- grawnRoofing:new Set(['Benzie','Grand Traverse','Kalkaska','Manistee','Wexford','Missaukee']),
+ grawnRoofing:new Set(['Benzie','Grand Traverse','Leelanau','Kalkaska','Manistee','Wexford','Missaukee']),
  roscommon:new Set(['Crawford','Oscoda','Roscommon','Ogemaw']),
  ludington:new Set(['Mason','Lake','Osceola','Clare','Oceana','Newaygo','Mecosta','Isabella']),
  lowell:new Set(['Muskegon','Ottawa','Kent','Ionia','Allegan','Barry','Montcalm']),
@@ -322,8 +323,13 @@ const zoneColors={
  roscommon:'#42ad82',ludington:'#35b5c8',lowell:'#0873ad',
  portage:'#8060a6',lansing:'#c29acb'
 };
+function countyName(feature){
+ const p=feature?.properties||{};
+ const raw=p.NAME||p.name||p.COUNTY_NAME||p.COUNTY||p.County||'';
+ return String(raw).replace(/\s+County$/i,'').replace(/\s+/g,' ').trim();
+}
 function countyZone(feature){
- const name=feature.properties?.NAME||feature.properties?.name||'';
+ const name=countyName(feature);
  for(const [zone,names] of Object.entries(zoneGroups))if(names.has(name))return zone;
  return null;
 }
@@ -339,11 +345,11 @@ function countyZone(feature){
    'Alger','Baraga','Chippewa','Delta','Dickinson','Gogebic','Houghton',
    'Iron','Keweenaw','Luce','Marquette','Menominee','Ontonagon','Schoolcraft'
   ]);
-  // Mackinac is shown in the reference key but belongs to the Upper Peninsula;
-  // keep the current map focused on the Lower Peninsula.
+  // Include Mackinac County (green Petoskey zone), while leaving the rest
+  // of the Upper Peninsula counties unfilled.
   const features=(geo.features||[]).filter(f=>{
-   const name=f.properties?.NAME||f.properties?.name||'';
-   return name && !upperPeninsulaNames.has(name) && name!=='Mackinac';
+   const name=countyName(f);
+   return name && (!upperPeninsulaNames.has(name) || name==='Mackinac' || name==='Leelanau');
   });
   if(!features.length)throw Error('No Lower Peninsula counties found');
   const collection={type:'FeatureCollection',features};
@@ -353,7 +359,30 @@ function countyZone(feature){
    interactive:false
   }).addTo(countyLayer);
 
-  L.geoJSON(collection,{
+  // Remove detached tiny polygon fragments from colored county fills so
+  // stray offshore islands do not get a zone color. Keep all Mackinac pieces.
+  function polygonAreaEstimate(ring){
+   let area=0;
+   for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+    area += ring[j][0]*ring[i][1] - ring[i][0]*ring[j][1];
+   }
+   return Math.abs(area/2);
+  }
+  const overlayFeatures=features.map(feature=>{
+   const name=countyName(feature);
+   const geometry=feature.geometry;
+   // Leelanau is a narrow peninsula county; preserve its full geometry.
+   if(!geometry || geometry.type!=='MultiPolygon' || name==='Mackinac' || name==='Leelanau')return feature;
+   const polygons=geometry.coordinates;
+   if(polygons.length<2)return feature;
+   const ranked=polygons.map((polygon,index)=>({
+    polygon,index,area:polygonAreaEstimate(polygon[0]||[])
+   })).sort((a,b)=>b.area-a.area);
+   // Keep the main county landmass only for counties that include detached islands.
+   return {...feature,geometry:{...geometry, type:'MultiPolygon',coordinates:[ranked[0].polygon]}};
+  });
+  const overlayCollection={type:'FeatureCollection',features:overlayFeatures};
+  L.geoJSON(overlayCollection,{
    style:feature=>{
     const zone=countyZone(feature);
     return {
