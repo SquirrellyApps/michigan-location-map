@@ -1,14 +1,15 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta name="aws-zone-colors-version" content="leelanau-county-fix-v1">
+<meta name="aws-zone-colors-version" content="retailos-leelanau-fips-fix-v3">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0645d8">
+<meta name="apple-mobile-web-app-title" content="RetailOS">
 <link rel="icon" type="image/png" sizes="512x512" href="./seal-gentleman-512.png">
 <link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>AWS STORE LOCATOR</title>
+<title>RetailOS</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{--navy:#17364f;--blue:#2477b7;--line:#d6dee6;--muted:#617282;--bg:#f4f7fa;--red:#a52b32}
@@ -67,7 +68,7 @@ footer{font-size:11px;color:#687987;padding:12px}
 </head>
 <body>
 <header>
- <div class="header-brand"><img class="header-logo" src="./seal-gentleman-512.png" alt="Seal gentleman app logo"><h1>AWS STORE LOCATOR</h1></div>
+ <div class="header-brand"><img class="header-logo" src="./seal-gentleman-512.png" alt="Seal gentleman app logo"><h1>RetailOS</h1></div>
  <div class="header-actions">
   <label class="pin-toggle"><input id="showZoneOverlay" type="checkbox"> Show zone colors</label>
   <label class="pin-toggle"><input id="showPinNames" type="checkbox" checked> Show pin names</label>
@@ -310,7 +311,7 @@ window.openAppleMaps=storeId=>{
 const zoneGroups={
  petoskey:new Set(['Mackinac','Emmet','Cheboygan','Presque Isle','Otsego','Montmorency','Alpena']),
  petoskeyRoofing:new Set(['Charlevoix','Antrim']),
- grawnRoofing:new Set(['Benzie','Grand Traverse','Kalkaska','Manistee','Wexford','Missaukee']),
+ grawnRoofing:new Set(['Benzie','Grand Traverse','Leelanau','Kalkaska','Manistee','Wexford','Missaukee']),
  roscommon:new Set(['Crawford','Oscoda','Roscommon','Ogemaw']),
  ludington:new Set(['Mason','Lake','Osceola','Clare','Oceana','Newaygo','Mecosta','Isabella']),
  lowell:new Set(['Muskegon','Ottawa','Kent','Ionia','Allegan','Barry','Montcalm']),
@@ -325,10 +326,17 @@ const zoneColors={
 function countyName(feature){
  const p=feature?.properties||{};
  const raw=p.NAME||p.name||p.COUNTY_NAME||p.COUNTY||p.County||'';
- return String(raw).replace(/\\s+County$/i,'').trim();
+ return String(raw).replace(/\s+County$/i,'').replace(/\s+/g,' ').trim();
 }
 function countyZone(feature){
  const name=countyName(feature);
+ // Leelanau's ArcGIS feature name varies between service revisions.
+ // Its Michigan county FIPS code is 089 (state+county: 26089).
+ const p=feature?.properties||{};
+ const fips=String(p.FIPSCODE??p.FIPS??p.GEOID??'').replace(/\\D/g,'');
+ if(name==='Leelanau' || name==='Leelanau County' || fips==='089' || fips==='26089'){
+  return 'grawnRoofing';
+ }
  for(const [zone,names] of Object.entries(zoneGroups))if(names.has(name))return zone;
  return null;
 }
